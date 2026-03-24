@@ -27,7 +27,6 @@ The plugin should help manage large catalogs where:
 ### Nice to Have
 
 - Saved views or presets
-- Bulk actions across selected rows
 - Import/export for the visible grid
 - Undo or change log
 - Custom field support
@@ -83,6 +82,9 @@ The first usable version should allow an admin to:
 ### Future Optional Fields
 
 - Custom meta fields
+- Weight
+- Dimensions (length, width, height)
+- Package type
 - Catalog family
 - Internal sort value
 - Migration reference
@@ -294,11 +296,41 @@ Goal: allow safe edits for common fields.
 
 - add editable cells
 - track dirty rows
-- save product edits
+- stabilize parent row save behavior first
+- save product edits reliably before broader expansion
 - save variation edits
 - return row-level validation errors
 
-## Phase 4: Programmatic Variation Row Generation
+## Phase 4: Hardening, Selection, and Variation Readiness
+
+Goal: make editing and selection dependable before scaling catalog operations.
+
+- complete parent-row editing stability hardening
+- ensure save error handling and row-state transitions are reliable
+- add true row selection (single, range, keyboard extension)
+- add multi-row bulk edit for selected rows
+- keep lazy-loaded variation behavior consistent with selection state
+
+## Phase 5: Category-Driven Workflow Operations
+
+Goal: make category workflows first-class for real catalog maintenance.
+
+- show categories in the grid by default
+- add category visibility controls where needed, but keep category context visible
+- expand category filters for operational slicing
+- preserve recursive category scope behavior for category-driven actions
+
+## Phase 6: Shipping Metadata Bulk Management
+
+Goal: reduce shipping and catalog cleanup friction using bulk-editable shipping fields.
+
+- add shipping columns to grid and editor payloads
+- bulk edit weight across selected rows
+- bulk edit dimensions across selected rows
+- bulk edit package type across selected rows
+- validate and normalize shipping field formats during save
+
+## Phase 7: Programmatic Variation Row Generation
 
 Goal: generate missing variation rows from parent attributes.
 
@@ -308,12 +340,11 @@ Goal: generate missing variation rows from parent attributes.
 - create missing variations on save
 - prevent duplicate combinations
 
-## Phase 5: Catalog Workflow Improvements
+## Phase 8: Catalog Workflow Improvements
 
 Goal: make the tool useful for ongoing operations.
 
 - custom field support
-- bulk selection and bulk edits
 - saved filters
 - export current view
 
@@ -348,9 +379,19 @@ For MVP, category scope selection should expand recursively and then operate on 
 1. Build the read-only product grid first.
 2. Add variation expansion and lazy loading.
 3. Add save infrastructure before inline editing.
-4. Add inline editing for a small field set.
-5. Add variation generation after the save layer is stable.
-6. Add bulk editing and custom fields after the core workflow works.
+4. Stabilize parent-row editing until saves are boring and reliable.
+5. Add true row selection plus multi-row bulk edit actions.
+6. Add category visibility in the grid and stronger category filtering.
+7. Add shipping fields (weight, dimensions, package type) to bulk edit workflows.
+8. Add variation generation after the save and bulk workflow are stable.
+9. Add custom fields and advanced workflow features.
+
+## Current Priority Gates
+
+1. Parent-row save stability is the hard gate before broadening feature surface.
+2. Selection + multi-row bulk edit is the next highest-value workflow step.
+3. Category visibility and category filtering are required for day-to-day operations.
+4. Shipping metadata is an immediate post-bulk-edit column set, not a distant backlog item.
 
 ## Immediate Next Implementation Tasks
 
@@ -364,6 +405,5 @@ For MVP, category scope selection should expand recursively and then operate on 
 
 - Which fields belong in the very first editable set
 - Whether to use admin AJAX or REST routes for saves
-- Whether categories should be visible in the grid by default
 - Whether custom fields are MVP or phase 5
 - Whether generated rows should be preview-only until explicit confirmation
