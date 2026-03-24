@@ -5,6 +5,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 $has_rows = ! empty( $rows );
+$status_options = array(
+	'publish' => __( 'Published', 'product-admin-tool' ),
+	'draft'   => __( 'Draft', 'product-admin-tool' ),
+	'pending' => __( 'Pending review', 'product-admin-tool' ),
+	'private' => __( 'Private', 'product-admin-tool' ),
+);
 ?>
 <div class="pat-grid-shell">
 	<table class="widefat fixed striped pat-grid" aria-describedby="pat-grid-caption">
@@ -21,16 +27,22 @@ $has_rows = ! empty( $rows );
 			<?php if ( $has_rows ) : ?>
 				<?php foreach ( $rows as $row ) : ?>
 					<?php
-					$row_id         = isset( $row['id'] ) ? (int) $row['id'] : 0;
-					$row_dom_id     = 'pat-row-' . $row_id;
-					$children       = isset( $row['child_rows'] ) && is_array( $row['child_rows'] ) ? $row['child_rows'] : array();
-					$can_expand     = ! empty( $row['has_children'] );
-					$product_name   = isset( $row['title'] ) ? (string) $row['title'] : '';
-					$product_type   = isset( $row['type'] ) ? (string) $row['type'] : 'product';
-					$product_link   = isset( $row['permalink'] ) ? (string) $row['permalink'] : '';
-					$categories     = isset( $row['categories'] ) && is_array( $row['categories'] ) ? implode( ', ', $row['categories'] ) : '';
-					$stock_display  = '';
-					$modified_label = '';
+					$row_id              = isset( $row['id'] ) ? (int) $row['id'] : 0;
+					$row_dom_id          = 'pat-row-' . $row_id;
+					$children            = isset( $row['child_rows'] ) && is_array( $row['child_rows'] ) ? $row['child_rows'] : array();
+					$can_expand          = ! empty( $row['has_children'] );
+					$product_name        = isset( $row['title'] ) ? (string) $row['title'] : '';
+					$product_type        = isset( $row['type'] ) ? (string) $row['type'] : 'product';
+					$categories          = isset( $row['categories'] ) && is_array( $row['categories'] ) ? implode( ', ', $row['categories'] ) : '';
+					$stock_display       = '';
+					$stock_input_value   = isset( $row['stock_quantity'] ) && null !== $row['stock_quantity'] ? (string) $row['stock_quantity'] : '';
+					$modified_label      = '';
+					$regular_price_value = isset( $row['regular_price'] ) ? (string) $row['regular_price'] : '';
+					$sale_price_value    = isset( $row['sale_price'] ) ? (string) $row['sale_price'] : '';
+					$sku_value           = isset( $row['sku'] ) ? (string) $row['sku'] : '';
+					$status_value        = isset( $row['status'] ) ? (string) $row['status'] : '';
+					$menu_order_value    = isset( $row['menu_order'] ) ? (string) $row['menu_order'] : '0';
+					$row_state_label     = '';
 
 					if ( isset( $row['stock_quantity'] ) && null !== $row['stock_quantity'] && '' !== (string) $row['stock_quantity'] ) {
 						$stock_display = (string) $row['stock_quantity'];
@@ -42,7 +54,7 @@ $has_rows = ! empty( $rows );
 						$modified_label = mysql2date( get_option( 'date_format' ), (string) $row['modified'] );
 					}
 					?>
-					<tr class="pat-row pat-parent-row" id="<?php echo esc_attr( $row_dom_id ); ?>" data-pat-row-id="<?php echo esc_attr( $row_id ); ?>">
+					<tr class="pat-row pat-parent-row" id="<?php echo esc_attr( $row_dom_id ); ?>" data-pat-row-id="<?php echo esc_attr( $row_id ); ?>" data-pat-row-type="product">
 						<td class="check-column">
 							<input type="checkbox" disabled="disabled" />
 						</td>
@@ -53,7 +65,6 @@ $has_rows = ! empty( $rows );
 										type="button"
 										class="button-link pat-row-toggle"
 										aria-expanded="false"
-										aria-disabled="true"
 										data-pat-toggle-children="true"
 										data-pat-target="<?php echo esc_attr( $row_dom_id ); ?>"
 									>
@@ -64,11 +75,17 @@ $has_rows = ! empty( $rows );
 									<span class="pat-row-toggle pat-row-toggle-spacer" aria-hidden="true"></span>
 								<?php endif; ?>
 
-								<?php if ( '' !== $product_link ) : ?>
-									<a class="pat-product-name pat-row-name" href="<?php echo esc_url( $product_link ); ?>" target="_blank" rel="noreferrer noopener"><?php echo esc_html( $product_name ); ?></a>
-								<?php else : ?>
-									<strong class="pat-product-name pat-row-name"><?php echo esc_html( $product_name ); ?></strong>
-								<?php endif; ?>
+								<label class="screen-reader-text" for="<?php echo esc_attr( 'pat-title-' . $row_id ); ?>"><?php esc_html_e( 'Product title', 'product-admin-tool' ); ?></label>
+								<input
+									id="<?php echo esc_attr( 'pat-title-' . $row_id ); ?>"
+									class="pat-inline-field pat-inline-title"
+									type="text"
+									value="<?php echo esc_attr( $product_name ); ?>"
+									data-pat-row-id="<?php echo esc_attr( $row_id ); ?>"
+									data-pat-row-type="product"
+									data-pat-field="title"
+									data-pat-original-value="<?php echo esc_attr( $product_name ); ?>"
+								/>
 
 								<?php if ( $can_expand ) : ?>
 									<span class="pat-badge"><?php esc_html_e( 'Variations available', 'product-admin-tool' ); ?></span>
@@ -82,11 +99,111 @@ $has_rows = ! empty( $rows );
 							</div>
 						</td>
 						<td><?php echo esc_html( $product_type ); ?></td>
-						<td><?php echo esc_html( isset( $row['sku'] ) ? (string) $row['sku'] : '' ); ?></td>
-						<td><?php echo esc_html( isset( $row['price'] ) ? (string) $row['price'] : '' ); ?></td>
-						<td><?php echo esc_html( $stock_display ); ?></td>
-						<td><?php echo esc_html( isset( $row['status'] ) ? (string) $row['status'] : '' ); ?></td>
-						<td><?php echo esc_html( $modified_label ); ?></td>
+						<td>
+							<label class="screen-reader-text" for="<?php echo esc_attr( 'pat-sku-' . $row_id ); ?>"><?php esc_html_e( 'SKU', 'product-admin-tool' ); ?></label>
+							<input
+								id="<?php echo esc_attr( 'pat-sku-' . $row_id ); ?>"
+								class="pat-inline-field pat-inline-sku"
+								type="text"
+								value="<?php echo esc_attr( $sku_value ); ?>"
+								data-pat-row-id="<?php echo esc_attr( $row_id ); ?>"
+								data-pat-row-type="product"
+								data-pat-field="sku"
+								data-pat-original-value="<?php echo esc_attr( $sku_value ); ?>"
+							/>
+						</td>
+						<td class="pat-price-cell">
+							<div class="pat-inline-field-group">
+								<label class="screen-reader-text" for="<?php echo esc_attr( 'pat-regular-price-' . $row_id ); ?>"><?php esc_html_e( 'Regular price', 'product-admin-tool' ); ?></label>
+								<input
+									id="<?php echo esc_attr( 'pat-regular-price-' . $row_id ); ?>"
+									class="pat-inline-field pat-inline-price"
+									type="number"
+									step="0.01"
+									inputmode="decimal"
+									value="<?php echo esc_attr( $regular_price_value ); ?>"
+									data-pat-row-id="<?php echo esc_attr( $row_id ); ?>"
+									data-pat-row-type="product"
+									data-pat-field="regular_price"
+									data-pat-original-value="<?php echo esc_attr( $regular_price_value ); ?>"
+								/>
+								<span class="pat-inline-label"><?php esc_html_e( 'Regular', 'product-admin-tool' ); ?></span>
+							</div>
+							<div class="pat-inline-field-group">
+								<label class="screen-reader-text" for="<?php echo esc_attr( 'pat-sale-price-' . $row_id ); ?>"><?php esc_html_e( 'Sale price', 'product-admin-tool' ); ?></label>
+								<input
+									id="<?php echo esc_attr( 'pat-sale-price-' . $row_id ); ?>"
+									class="pat-inline-field pat-inline-price"
+									type="number"
+									step="0.01"
+									inputmode="decimal"
+									value="<?php echo esc_attr( $sale_price_value ); ?>"
+									data-pat-row-id="<?php echo esc_attr( $row_id ); ?>"
+									data-pat-row-type="product"
+									data-pat-field="sale_price"
+									data-pat-original-value="<?php echo esc_attr( $sale_price_value ); ?>"
+								/>
+								<span class="pat-inline-label"><?php esc_html_e( 'Sale', 'product-admin-tool' ); ?></span>
+							</div>
+						</td>
+						<td>
+							<label class="screen-reader-text" for="<?php echo esc_attr( 'pat-stock-' . $row_id ); ?>"><?php esc_html_e( 'Stock quantity', 'product-admin-tool' ); ?></label>
+							<input
+								id="<?php echo esc_attr( 'pat-stock-' . $row_id ); ?>"
+								class="pat-inline-field pat-inline-stock"
+								type="number"
+								step="1"
+								inputmode="numeric"
+								value="<?php echo esc_attr( $stock_input_value ); ?>"
+								data-pat-row-id="<?php echo esc_attr( $row_id ); ?>"
+								data-pat-row-type="product"
+								data-pat-field="stock_quantity"
+								data-pat-original-value="<?php echo esc_attr( $stock_input_value ); ?>"
+							/>
+						</td>
+						<td>
+							<label class="screen-reader-text" for="<?php echo esc_attr( 'pat-status-' . $row_id ); ?>"><?php esc_html_e( 'Status', 'product-admin-tool' ); ?></label>
+							<select
+								id="<?php echo esc_attr( 'pat-status-' . $row_id ); ?>"
+								class="pat-inline-field pat-inline-status"
+								data-pat-row-id="<?php echo esc_attr( $row_id ); ?>"
+								data-pat-row-type="product"
+								data-pat-field="status"
+								data-pat-original-value="<?php echo esc_attr( $status_value ); ?>"
+							>
+								<?php foreach ( $status_options as $value => $label ) : ?>
+									<option value="<?php echo esc_attr( $value ); ?>" <?php selected( $status_value, $value ); ?>>
+										<?php echo esc_html( $label ); ?>
+									</option>
+								<?php endforeach; ?>
+							</select>
+						</td>
+						<td>
+							<div class="pat-inline-field-group">
+								<label class="screen-reader-text" for="<?php echo esc_attr( 'pat-menu-order-' . $row_id ); ?>"><?php esc_html_e( 'Menu order', 'product-admin-tool' ); ?></label>
+								<input
+									id="<?php echo esc_attr( 'pat-menu-order-' . $row_id ); ?>"
+									class="pat-inline-field pat-inline-menu-order"
+									type="number"
+									step="1"
+									inputmode="numeric"
+									value="<?php echo esc_attr( $menu_order_value ); ?>"
+									data-pat-row-id="<?php echo esc_attr( $row_id ); ?>"
+									data-pat-row-type="product"
+									data-pat-field="menu_order"
+									data-pat-original-value="<?php echo esc_attr( $menu_order_value ); ?>"
+								/>
+								<span class="pat-inline-label"><?php esc_html_e( 'Menu Order', 'product-admin-tool' ); ?></span>
+							</div>
+							<?php if ( '' !== $modified_label ) : ?>
+								<div class="pat-row-meta">
+									<span class="pat-row-updated"><?php echo esc_html( $modified_label ); ?></span>
+								</div>
+							<?php endif; ?>
+						</td>
+						<td class="pat-row-state" data-pat-row-state>
+							<span class="pat-row-state-message" data-pat-row-state-message><?php echo esc_html( $row_state_label ); ?></span>
+						</td>
 					</tr>
 
 					<?php foreach ( $children as $child ) : ?>
@@ -96,7 +213,7 @@ $has_rows = ! empty( $rows );
 						$child_summary = isset( $child['attribute_summary'] ) ? (string) $child['attribute_summary'] : '';
 						$child_label   = '' !== $child_summary ? $child_summary : ( isset( $child['title'] ) ? (string) $child['title'] : __( 'Variation', 'product-admin-tool' ) );
 						?>
-						<tr class="pat-row pat-child-row is-child-row is-hidden" data-pat-parent="<?php echo esc_attr( $row_dom_id ); ?>" hidden>
+						<tr class="pat-row pat-child-row is-child-row is-hidden" data-pat-parent="<?php echo esc_attr( $row_dom_id ); ?>" data-pat-row-id="<?php echo esc_attr( $child_id ); ?>" data-pat-row-type="variation" hidden>
 							<td class="check-column">
 								<input type="checkbox" disabled="disabled" />
 							</td>
@@ -118,6 +235,9 @@ $has_rows = ! empty( $rows );
 							<td><?php echo esc_html( $child_stock ); ?></td>
 							<td><?php echo esc_html( isset( $child['status'] ) ? (string) $child['status'] : '' ); ?></td>
 							<td><?php echo esc_html( $child_summary ); ?></td>
+							<td class="pat-row-state">
+								<span class="pat-row-state-message" data-pat-row-state-message></span>
+							</td>
 						</tr>
 					<?php endforeach; ?>
 				<?php endforeach; ?>

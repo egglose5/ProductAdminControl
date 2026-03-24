@@ -42,6 +42,7 @@ class PAT_Product_Grid_Table {
 			'stock'    => __( 'Stock', 'product-admin-tool' ),
 			'status'   => __( 'Status', 'product-admin-tool' ),
 			'details'  => __( 'Details', 'product-admin-tool' ),
+			'state'    => __( 'State', 'product-admin-tool' ),
 		);
 	}
 

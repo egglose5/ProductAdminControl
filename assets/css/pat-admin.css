@@ -41,6 +41,57 @@
 	margin: 16px 0;
 }
 
+.pat-admin-shell .pat-save-bar,
+.pat-product-editor .pat-save-bar {
+	align-items: flex-start;
+	background: linear-gradient(135deg, rgba(138, 90, 68, 0.08), rgba(255, 255, 255, 0.98));
+	border-left: 4px solid var(--pat-accent);
+}
+
+.pat-admin-shell .pat-save-bar .pat-save-meta,
+.pat-product-editor .pat-save-bar .pat-save-meta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 12px;
+}
+
+.pat-admin-shell .pat-save-bar .pat-save-state,
+.pat-product-editor .pat-save-bar .pat-save-state,
+.pat-admin-shell .pat-save-bar .pat-save-count,
+.pat-product-editor .pat-save-bar .pat-save-count {
+	display: inline-flex;
+	align-items: center;
+	padding: 4px 10px;
+	border-radius: 999px;
+	background: var(--pat-surface);
+	border: 1px solid var(--pat-border);
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--pat-text);
+}
+
+.pat-admin-shell .pat-save-bar .pat-save-state[data-pat-save-status="saving"],
+.pat-product-editor .pat-save-bar .pat-save-state[data-pat-save-status="saving"] {
+	background: rgba(138, 90, 68, 0.12);
+	border-color: rgba(138, 90, 68, 0.25);
+	color: var(--pat-accent);
+}
+
+.pat-admin-shell .pat-save-bar .pat-save-state[data-pat-save-status="error"],
+.pat-product-editor .pat-save-bar .pat-save-state[data-pat-save-status="error"] {
+	background: rgba(185, 28, 28, 0.12);
+	border-color: rgba(185, 28, 28, 0.25);
+	color: #b91c1c;
+}
+
+.pat-admin-shell .pat-save-bar .pat-save-state[data-pat-save-status="saved"],
+.pat-product-editor .pat-save-bar .pat-save-state[data-pat-save-status="saved"] {
+	background: rgba(22, 163, 74, 0.12);
+	border-color: rgba(22, 163, 74, 0.25);
+	color: #15803d;
+}
+
 .pat-admin-shell .pat-filter-bar,
 .pat-product-editor .pat-filter-bar {
 	border-bottom-left-radius: 10px;
@@ -108,6 +159,102 @@
 	vertical-align: middle;
 }
 
+.pat-admin-shell .pat-grid [data-pat-field],
+.pat-product-editor .pat-grid [data-pat-field] {
+	display: block;
+	width: 100%;
+	max-width: 100%;
+	padding: 6px 8px;
+	border: 1px solid transparent;
+	border-radius: 8px;
+	background: transparent;
+	color: var(--pat-text);
+	font: inherit;
+	line-height: 1.3;
+	transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pat-admin-shell .pat-grid .pat-inline-field-group,
+.pat-product-editor .pat-grid .pat-inline-field-group {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.pat-admin-shell .pat-grid .pat-inline-label,
+.pat-product-editor .pat-grid .pat-inline-label {
+	color: var(--pat-muted);
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+}
+
+.pat-admin-shell .pat-grid .pat-inline-title,
+.pat-product-editor .pat-grid .pat-inline-title {
+	min-width: 240px;
+}
+
+.pat-admin-shell .pat-grid .pat-inline-price,
+.pat-product-editor .pat-grid .pat-inline-price,
+.pat-admin-shell .pat-grid .pat-inline-sku,
+.pat-product-editor .pat-grid .pat-inline-sku,
+.pat-admin-shell .pat-grid .pat-inline-stock,
+.pat-product-editor .pat-grid .pat-inline-stock,
+.pat-admin-shell .pat-grid .pat-inline-status,
+.pat-product-editor .pat-grid .pat-inline-status {
+	min-width: 110px;
+}
+
+.pat-admin-shell .pat-grid .pat-row-state,
+.pat-product-editor .pat-grid .pat-row-state {
+	min-width: 120px;
+}
+
+.pat-admin-shell .pat-grid .pat-row-state-message,
+.pat-product-editor .pat-grid .pat-row-state-message {
+	display: block;
+	color: var(--pat-muted);
+	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: 0.01em;
+	text-transform: uppercase;
+}
+
+.pat-admin-shell .pat-grid tr.is-dirty .pat-row-state-message,
+.pat-product-editor .pat-grid tr.is-dirty .pat-row-state-message {
+	color: var(--pat-accent);
+}
+
+.pat-admin-shell .pat-grid tr.is-saving .pat-row-state-message,
+.pat-product-editor .pat-grid tr.is-saving .pat-row-state-message {
+	color: var(--pat-accent);
+}
+
+.pat-admin-shell .pat-grid tr.is-saved .pat-row-state-message,
+.pat-product-editor .pat-grid tr.is-saved .pat-row-state-message {
+	color: #15803d;
+}
+
+.pat-admin-shell .pat-grid tr.is-error .pat-row-state-message,
+.pat-product-editor .pat-grid tr.is-error .pat-row-state-message {
+	color: #b91c1c;
+}
+
+.pat-admin-shell .pat-grid [data-pat-field]:focus,
+.pat-product-editor .pat-grid [data-pat-field]:focus {
+	border-color: var(--pat-border-strong);
+	background: #fff;
+	box-shadow: 0 0 0 2px rgba(138, 90, 68, 0.12);
+	outline: none;
+}
+
+.pat-admin-shell .pat-grid [data-pat-field].is-dirty,
+.pat-product-editor .pat-grid [data-pat-field].is-dirty {
+	background: rgba(138, 90, 68, 0.06);
+	border-color: rgba(138, 90, 68, 0.3);
+}
+
 .pat-admin-shell .pat-grid tbody tr:hover,
 .pat-product-editor .pat-grid tbody tr:hover {
 	background: var(--pat-row-hover);
@@ -170,6 +317,29 @@
 	background: #fcfbf8;
 }
 
+.pat-admin-shell .pat-grid tr.is-dirty,
+.pat-product-editor .pat-grid tr.is-dirty {
+	background: rgba(138, 90, 68, 0.06);
+	box-shadow: inset 3px 0 0 var(--pat-accent);
+}
+
+.pat-admin-shell .pat-grid tr.is-saving,
+.pat-product-editor .pat-grid tr.is-saving {
+	background: rgba(138, 90, 68, 0.035);
+	opacity: 0.9;
+}
+
+.pat-admin-shell .pat-grid tr.is-saved,
+.pat-product-editor .pat-grid tr.is-saved {
+	background: rgba(22, 163, 74, 0.05);
+}
+
+.pat-admin-shell .pat-grid tr.is-error,
+.pat-product-editor .pat-grid tr.is-error {
+	background: rgba(185, 28, 28, 0.06);
+	box-shadow: inset 3px 0 0 #b91c1c;
+}
+
 .pat-admin-shell .pat-grid tr.is-child-row td:first-child,
 .pat-product-editor .pat-grid tr.is-child-row td:first-child {
 	padding-left: 26px;
@@ -193,6 +363,37 @@
 	color: var(--pat-text);
 	font-size: 15px;
 	margin-bottom: 8px;
+}
+
+.pat-admin-shell .pat-grid .pat-row-status,
+.pat-product-editor .pat-grid .pat-row-status {
+	display: block;
+	margin-top: 6px;
+	color: var(--pat-muted);
+	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: 0.01em;
+	text-transform: uppercase;
+}
+
+.pat-admin-shell .pat-grid tr.is-dirty .pat-row-status,
+.pat-product-editor .pat-grid tr.is-dirty .pat-row-status {
+	color: var(--pat-accent);
+}
+
+.pat-admin-shell .pat-grid tr.is-saving .pat-row-status,
+.pat-product-editor .pat-grid tr.is-saving .pat-row-status {
+	color: var(--pat-accent);
+}
+
+.pat-admin-shell .pat-grid tr.is-saved .pat-row-status,
+.pat-product-editor .pat-grid tr.is-saved .pat-row-status {
+	color: #15803d;
+}
+
+.pat-admin-shell .pat-grid tr.is-error .pat-row-status,
+.pat-product-editor .pat-grid tr.is-error .pat-row-status {
+	color: #b91c1c;
 }
 
 .pat-admin-shell .pat-pagination-summary,

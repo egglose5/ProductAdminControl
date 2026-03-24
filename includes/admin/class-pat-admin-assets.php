@@ -37,7 +37,10 @@ class PAT_Admin_Assets {
 			'PATAdmin',
 			array(
 				'screenSlug' => PAT_Admin_Screen::get_menu_slug(),
-				'nonce'      => wp_create_nonce( 'pat-admin' ),
+				'nonce'      => class_exists( 'PAT_Save_Controller' ) ? wp_create_nonce( PAT_Save_Controller::NONCE_ACTION ) : wp_create_nonce( 'pat-admin' ),
+				'nonceField' => class_exists( 'PAT_Save_Controller' ) ? PAT_Save_Controller::NONCE_FIELD : 'nonce',
+				'ajaxUrl'    => admin_url( 'admin-ajax.php' ),
+				'saveAction' => class_exists( 'PAT_Save_Controller' ) ? PAT_Save_Controller::AJAX_ACTION : '',
 			)
 		);
 	}
