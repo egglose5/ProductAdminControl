@@ -10,6 +10,7 @@ class PAT_Plugin {
 	private $admin_menu;
 	private $admin_assets;
 	private $save_controller;
+	private $variation_controller;
 
 	public static function instance(): PAT_Plugin {
 		if ( null === self::$instance ) {
@@ -24,6 +25,7 @@ class PAT_Plugin {
 		$this->admin_menu   = new PAT_Admin_Menu( $editor_page );
 		$this->admin_assets = new PAT_Admin_Assets();
 		$this->save_controller = class_exists( 'PAT_Save_Controller' ) ? new PAT_Save_Controller() : null;
+		$this->variation_controller = class_exists( 'PAT_Variation_Controller' ) ? new PAT_Variation_Controller() : null;
 	}
 
 	public function boot(): void {
@@ -31,6 +33,9 @@ class PAT_Plugin {
 		$this->admin_assets->register();
 		if ( $this->save_controller && method_exists( $this->save_controller, 'register' ) ) {
 			$this->save_controller->register();
+		}
+		if ( $this->variation_controller && method_exists( $this->variation_controller, 'register' ) ) {
+			$this->variation_controller->register();
 		}
 		add_action( 'plugins_loaded', array( $this, 'load_textdomain' ) );
 		add_action( 'admin_notices', array( $this, 'maybe_show_woocommerce_notice' ) );

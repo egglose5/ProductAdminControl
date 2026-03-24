@@ -3,6 +3,181 @@
 
 	var ROW_SELECTOR = '[data-pat-row-id]';
 	var FIELD_SELECTOR = '[data-pat-field]';
+	var variationLoadState = Object.create(null);
+
+	function createVariationState() {
+		return {
+			status: 'idle',
+			message: '',
+			loading: false,
+			loaded: false,
+			errored: false,
+			rows: [],
+			html: ''
+		};
+	}
+
+	function getVariationStateKey(parentId) {
+		var normalized = parseInt(parentId, 10);
+
+		return String(isNaN(normalized) ? parentId || '' : normalized);
+	}
+
+	function getVariationState(parentId) {
+		var key = getVariationStateKey(parentId);
+
+		if (!variationLoadState[key]) {
+			variationLoadState[key] = createVariationState();
+		}
+
+		return variationLoadState[key];
+	}
+
+	function getRowById(rowId) {
+		if (!rowId && 0 !== rowId) {
+			return null;
+		}
+
+		return document.querySelector(ROW_SELECTOR + '[data-pat-row-id="' + rowId + '"]');
+	}
+
+	function getParentRowById(parentId) {
+		if (!parentId && 0 !== parentId) {
+			return null;
+		}
+
+		return document.querySelector(ROW_SELECTOR + '[data-pat-row-type="product"][data-pat-row-id="' + parentId + '"]');
+	}
+
+	function getParentIdFromRow(row) {
+		if (!row) {
+			return 0;
+		}
+
+		return parseInt(row.getAttribute('data-pat-row-id'), 10) || 0;
+	}
+
+	function getParentDomId(row) {
+		if (!row) {
+			return '';
+		}
+
+		return row.id || '';
+	}
+
+	function getVariationStatusNode(row) {
+		if (!row) {
+			return null;
+		}
+
+		return row.querySelector('[data-pat-variation-status]');
+	}
+
+	function syncVariationRowState(parentId, state) {
+		var row = getParentRowById(parentId);
+
+		if (!row) {
+			return;
+		}
+
+		var classes = [ 'is-loading-variations', 'is-variation-error', 'is-variation-loaded' ];
+		var status = state && state.status ? state.status : 'idle';
+
+		classes.forEach(function (className) {
+			row.classList.remove(className);
+		});
+
+		row.removeAttribute('data-pat-variation-load-state');
+		row.removeAttribute('data-pat-variation-load-message');
+		row.removeAttribute('aria-busy');
+
+		if ('loading' === status) {
+			row.classList.add('is-loading-variations');
+			row.setAttribute('data-pat-variation-load-state', 'loading');
+			row.setAttribute('aria-busy', 'true');
+		} else if ('error' === status) {
+			row.classList.add('is-variation-error');
+			row.setAttribute('data-pat-variation-load-state', 'error');
+		} else if ('loaded' === status) {
+			row.classList.add('is-variation-loaded');
+			row.setAttribute('data-pat-variation-load-state', 'loaded');
+		}
+
+		if (state && state.message) {
+			row.setAttribute('data-pat-variation-load-message', state.message);
+		}
+
+		var statusNode = getVariationStatusNode(row);
+
+		if (!statusNode) {
+			return;
+		}
+
+		statusNode.textContent = state && state.message ? state.message : '';
+	}
+
+	function setVariationState(parentId, nextState) {
+		var key = getVariationStateKey(parentId);
+		var current = variationLoadState[key] || createVariationState();
+		var state = {
+			status: nextState && nextState.status ? nextState.status : current.status,
+			message: nextState && 'undefined' !== typeof nextState.message ? toStringValue(nextState.message) : current.message,
+			loading: nextState && 'undefined' !== typeof nextState.loading ? !!nextState.loading : 'loading' === current.status,
+			loaded: nextState && 'undefined' !== typeof nextState.loaded ? !!nextState.loaded : 'loaded' === current.status,
+			errored: nextState && 'undefined' !== typeof nextState.errored ? !!nextState.errored : 'error' === current.status,
+			rows: nextState && Array.isArray(nextState.rows) ? nextState.rows.slice() : current.rows.slice(),
+			html: nextState && 'undefined' !== typeof nextState.html ? toStringValue(nextState.html) : current.html
+		};
+
+		variationLoadState[key] = state;
+		syncVariationRowState(parentId, state);
+
+		return state;
+	}
+
+	function cacheVariationRows(parentId, rows, html) {
+		return setVariationState(parentId, {
+			status: 'loaded',
+			message: '',
+			loading: false,
+			loaded: true,
+			errored: false,
+			rows: Array.isArray(rows) ? rows.slice() : [],
+			html: html || ''
+		});
+	}
+
+	function markVariationLoading(parentId, message) {
+		return setVariationState(parentId, {
+			status: 'loading',
+			message: message || 'Loading variations...',
+			loading: true,
+			loaded: false,
+			errored: false
+		});
+	}
+
+	function markVariationError(parentId, message) {
+		return setVariationState(parentId, {
+			status: 'error',
+			message: message || 'Variation load failed.',
+			loading: false,
+			loaded: false,
+			errored: true
+		});
+	}
+
+	function clearVariationState(parentId) {
+		return setVariationState(parentId, {
+			status: 'idle',
+			message: '',
+			loading: false,
+			loaded: false,
+			errored: false,
+			rows: [],
+			html: ''
+		});
+	}
 
 	function toStringValue(value) {
 		if (null === value || 'undefined' === typeof value) {
@@ -174,19 +349,22 @@
 
 	function syncRowState(row) {
 		var state = 'clean';
+		var currentState = getRowState(row);
 		var dirtyFields = row.querySelectorAll(FIELD_SELECTOR + '.is-dirty');
 
-		if ('saving' === row.getAttribute('data-pat-row-state')) {
+		if ('saving' === currentState) {
 			state = 'saving';
-		} else if ('error' === row.getAttribute('data-pat-row-state')) {
-			state = 'error';
-		} else if ('saved' === row.getAttribute('data-pat-row-state') && dirtyFields.length === 0) {
+		} else if ('saved' === currentState && dirtyFields.length === 0) {
 			state = 'saved';
+		} else if ('error' === currentState && dirtyFields.length === 0) {
+			state = 'clean';
+		} else if ('error' === currentState) {
+			state = 'error';
 		} else if (dirtyFields.length) {
 			state = 'dirty';
 		}
 
-		setRowState(row, state, row.getAttribute('data-pat-row-message') || '');
+		setRowState(row, state, 'clean' === state ? '' : row.getAttribute('data-pat-row-message') || '');
 	}
 
 	function snapshotEditableFields(root) {
@@ -209,6 +387,18 @@
 
 	function getDirtyRowElements(root) {
 		return root.querySelectorAll(ROW_SELECTOR + '[data-pat-row-state="dirty"], ' + ROW_SELECTOR + '[data-pat-row-state="error"]');
+	}
+
+	function getEditorState(root) {
+		if (root.querySelector(ROW_SELECTOR + '[data-pat-row-state="saving"]')) {
+			return 'saving';
+		}
+
+		if (getDirtyRowElements(root).length) {
+			return 'dirty';
+		}
+
+		return 'idle';
 	}
 
 	function updateToolbar(root, state, message) {
@@ -396,7 +586,7 @@
 
 			ensureOriginalValue(field);
 			updateFieldState(field);
-			updateToolbar(root, 'dirty');
+			updateToolbar(root, getEditorState(root));
 		});
 
 		root.addEventListener('change', function (event) {
@@ -408,7 +598,7 @@
 
 			ensureOriginalValue(field);
 			updateFieldState(field);
-			updateToolbar(root, 'dirty');
+			updateToolbar(root, getEditorState(root));
 		});
 	}
 
@@ -432,6 +622,74 @@
 		updateToolbar(root, 'idle', 'No pending changes.');
 	}
 
+	function getChildRowsByParentDomId(parentDomId) {
+		if (!parentDomId) {
+			return [];
+		}
+
+		return Array.prototype.slice.call(document.querySelectorAll('[data-pat-parent="' + parentDomId + '"]'));
+	}
+
+	function removeChildRowsByParentDomId(parentDomId) {
+		getChildRowsByParentDomId(parentDomId).forEach(function (row) {
+			row.parentNode.removeChild(row);
+		});
+	}
+
+	function insertVariationMarkup(parentRow, html) {
+		var parentDomId = getParentDomId(parentRow);
+
+		if (!parentRow || !parentDomId || !html) {
+			return [];
+		}
+
+		removeChildRowsByParentDomId(parentDomId);
+		parentRow.insertAdjacentHTML('afterend', html);
+
+		return getChildRowsByParentDomId(parentDomId);
+	}
+
+	function requestVariations(parentId) {
+		if (!window.PATAdmin || !window.PATAdmin.ajaxUrl || !window.PATAdmin.variationAction) {
+			return Promise.resolve({
+				success: false,
+				message: 'Variation endpoint is not configured.',
+				rows: [],
+				html: ''
+			});
+		}
+
+		var formData = new window.FormData();
+		formData.append('action', window.PATAdmin.variationAction);
+		formData.append(window.PATAdmin.variationNonceField || 'nonce', window.PATAdmin.variationNonce || '');
+		formData.append('parent_id', String(parentId));
+
+		return window.fetch(window.PATAdmin.ajaxUrl, {
+			method: 'POST',
+			credentials: 'same-origin',
+			body: formData
+		}).then(function (response) {
+			return response.json().catch(function () {
+				return {
+					success: false,
+					message: 'Variation response could not be parsed.',
+					rows: [],
+					html: ''
+				};
+			});
+		});
+	}
+
+	function updateToggleButton(button, expanded) {
+		button.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+
+		var label = button.querySelector('[data-pat-toggle-label]');
+
+		if (label) {
+			label.textContent = expanded ? 'Collapse' : 'Expand';
+		}
+	}
+
 	function setHidden(rows, hidden) {
 		rows.forEach(function (row) {
 			row.classList.toggle('is-hidden', hidden);
@@ -440,7 +698,7 @@
 		});
 	}
 
-	function toggleChildren(button) {
+	function toggleChildren(root, button) {
 		var targetId = button.getAttribute('data-pat-target');
 
 		if (!targetId) {
@@ -448,6 +706,7 @@
 		}
 
 		var parentRow = document.getElementById(targetId);
+		var parentId = parentRow ? getParentIdFromRow(parentRow) : 0;
 
 		if (!parentRow) {
 			return;
@@ -455,19 +714,75 @@
 
 		var expanded = button.getAttribute('aria-expanded') === 'true';
 		var showChildren = !expanded;
-		var childRows = document.querySelectorAll('[data-pat-parent="' + targetId + '"]');
+		var childRows = getChildRowsByParentDomId(targetId);
+		var variationState = getVariationState(parentId);
 
-		if (!childRows.length) {
+		if (!showChildren) {
+			updateToggleButton(button, false);
+			parentRow.classList.remove('is-open');
+			setHidden(childRows, true);
 			return;
 		}
 
-		button.setAttribute('aria-expanded', showChildren ? 'true' : 'false');
-		parentRow.classList.toggle('is-open', showChildren);
-		setHidden(Array.prototype.slice.call(childRows), !showChildren);
-
-		if (button.querySelector('[data-pat-toggle-label]')) {
-			button.querySelector('[data-pat-toggle-label]').textContent = showChildren ? 'Collapse' : 'Expand';
+		if (childRows.length) {
+			updateToggleButton(button, true);
+			parentRow.classList.add('is-open');
+			setHidden(childRows, false);
+			cacheVariationRows(parentId, variationState.rows.length ? variationState.rows : childRows.map(function (row) {
+				return {
+					id: parseInt(row.getAttribute('data-pat-row-id'), 10) || 0,
+					row_type: getRowType(row)
+				};
+			}), variationState.html || '');
+			return;
 		}
+
+		if (variationState.loaded && variationState.html) {
+			childRows = insertVariationMarkup(parentRow, variationState.html);
+			snapshotEditableFields(root);
+			updateToggleButton(button, true);
+			parentRow.classList.add('is-open');
+			setHidden(childRows, false);
+			return;
+		}
+
+		if (variationState.loading) {
+			return;
+		}
+
+		markVariationLoading(parentId, 'Loading variations...');
+
+		requestVariations(parentId).then(function (response) {
+			var payload = response && response.data && !Array.isArray(response.rows) ? response.data : response;
+			var rows = payload && Array.isArray(payload.rows) ? payload.rows : [];
+			var html = payload && payload.html ? payload.html : '';
+			var message = payload && payload.message ? payload.message : '';
+
+			if (!payload || !payload.success) {
+				throw new Error(message || 'Variation load failed.');
+			}
+
+			cacheVariationRows(parentId, rows, html);
+
+			if (html) {
+				childRows = insertVariationMarkup(parentRow, html);
+				snapshotEditableFields(root);
+			} else {
+				childRows = getChildRowsByParentDomId(targetId);
+			}
+
+			updateToggleButton(button, true);
+			parentRow.classList.add('is-open');
+			setHidden(childRows, false);
+			syncVariationRowState(parentId, {
+				status: 'loaded',
+				message: message
+			});
+		}).catch(function (error) {
+			markVariationError(parentId, error && error.message ? error.message : 'Variation load failed.');
+			updateToggleButton(button, false);
+			parentRow.classList.remove('is-open');
+		});
 	}
 
 	function bindToggles(root) {
@@ -476,7 +791,7 @@
 		Array.prototype.forEach.call(buttons, function (button) {
 			button.addEventListener('click', function (event) {
 				event.preventDefault();
-				toggleChildren(button);
+				toggleChildren(root, button);
 			});
 		});
 	}

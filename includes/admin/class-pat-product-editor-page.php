@@ -37,7 +37,7 @@ class PAT_Product_Editor_Page {
 		$pagination            = isset( $grid_data['pagination'] ) && is_array( $grid_data['pagination'] ) ? $grid_data['pagination'] : array();
 		$current_page_slug     = $this->get_page_slug();
 		$woocommerce_available = PAT_Requirements::has_woocommerce();
-		$editor_mode           = 'phase-3-shell';
+		$editor_mode           = 'phase-4-shell';
 		$template              = PAT_PLUGIN_PATH . 'includes/admin/views/product-editor-page.php';
 
 		if ( ! file_exists( $template ) ) {

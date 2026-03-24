@@ -340,6 +340,37 @@
 	box-shadow: inset 3px 0 0 #b91c1c;
 }
 
+.pat-admin-shell .pat-grid tr.is-loading-variations,
+.pat-product-editor .pat-grid tr.is-loading-variations {
+	background: rgba(138, 90, 68, 0.03);
+}
+
+.pat-admin-shell .pat-grid tr.is-loading-variations .pat-row-toggle,
+.pat-product-editor .pat-grid tr.is-loading-variations .pat-row-toggle {
+	cursor: progress;
+	opacity: 0.75;
+}
+
+.pat-admin-shell .pat-grid tr.is-loading-variations .pat-row-status,
+.pat-product-editor .pat-grid tr.is-loading-variations .pat-row-status,
+.pat-admin-shell .pat-grid tr.is-loading-variations .pat-row-state-message,
+.pat-product-editor .pat-grid tr.is-loading-variations .pat-row-state-message {
+	color: var(--pat-muted);
+}
+
+.pat-admin-shell .pat-grid tr.is-variation-error,
+.pat-product-editor .pat-grid tr.is-variation-error {
+	background: rgba(245, 158, 11, 0.08);
+	box-shadow: inset 3px 0 0 #b45309;
+}
+
+.pat-admin-shell .pat-grid tr.is-variation-error .pat-row-status,
+.pat-product-editor .pat-grid tr.is-variation-error .pat-row-status,
+.pat-admin-shell .pat-grid tr.is-variation-error .pat-row-state-message,
+.pat-product-editor .pat-grid tr.is-variation-error .pat-row-state-message {
+	color: #b45309;
+}
+
 .pat-admin-shell .pat-grid tr.is-child-row td:first-child,
 .pat-product-editor .pat-grid tr.is-child-row td:first-child {
 	padding-left: 26px;
@@ -374,6 +405,11 @@
 	font-weight: 600;
 	letter-spacing: 0.01em;
 	text-transform: uppercase;
+}
+
+.pat-admin-shell .pat-grid .pat-row-status:empty,
+.pat-product-editor .pat-grid .pat-row-status:empty {
+	display: none;
 }
 
 .pat-admin-shell .pat-grid tr.is-dirty .pat-row-status,

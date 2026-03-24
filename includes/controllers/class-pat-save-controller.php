@@ -120,6 +120,7 @@ class PAT_Save_Controller {
 				'row_type' => $row_type,
 				'changes'  => $changes,
 				'data'     => isset( $service_result['data'] ) && is_array( $service_result['data'] ) ? $service_result['data'] : array(),
+				'errors'   => isset( $service_result['errors'] ) && is_array( $service_result['errors'] ) ? $service_result['errors'] : array(),
 			)
 		);
 	}

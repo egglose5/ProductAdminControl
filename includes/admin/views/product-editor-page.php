@@ -8,7 +8,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	<h1><?php esc_html_e( 'Product Editor', 'product-admin-tool' ); ?></h1>
 
 	<p class="description">
-		<?php esc_html_e( 'Phase 3 adds the editor shell on top of the grid: dirty-row tracking, save status, and the batch-save surface for editable product fields.', 'product-admin-tool' ); ?>
+		<?php esc_html_e( 'Phase 4 hardens the save baseline and converts variation expansion into a real lazy-loaded AJAX flow while keeping the storefront untouched.', 'product-admin-tool' ); ?>
 	</p>
 
 	<?php if ( ! $woocommerce_available ) : ?>
@@ -32,7 +32,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 		<button type="button" class="button" disabled="disabled"><?php esc_html_e( 'Bulk Edit', 'product-admin-tool' ); ?></button>
 		<button type="button" class="button" disabled="disabled"><?php esc_html_e( 'Fill Down', 'product-admin-tool' ); ?></button>
 		<button type="button" class="button" disabled="disabled"><?php esc_html_e( 'Generate Variations', 'product-admin-tool' ); ?></button>
-		<span class="description"><?php esc_html_e( 'Bulk actions remain disabled until the save pipeline is built. Category-scoped execution will still default to parent categories plus all descendants.', 'product-admin-tool' ); ?></span>
+		<span class="description"><?php esc_html_e( 'Bulk actions remain disabled. Variation preview generation is being added behind the scenes, but the first Phase 4 focus is hardening and lazy loading.', 'product-admin-tool' ); ?></span>
 	</div>
 
 	<?php if ( $grid_table instanceof PAT_Product_Grid_Table ) : ?>

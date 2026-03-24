@@ -54,7 +54,7 @@ $status_options = array(
 						$modified_label = mysql2date( get_option( 'date_format' ), (string) $row['modified'] );
 					}
 					?>
-					<tr class="pat-row pat-parent-row" id="<?php echo esc_attr( $row_dom_id ); ?>" data-pat-row-id="<?php echo esc_attr( $row_id ); ?>" data-pat-row-type="product">
+					<tr class="pat-row pat-parent-row" id="<?php echo esc_attr( $row_dom_id ); ?>" data-pat-row-id="<?php echo esc_attr( $row_id ); ?>" data-pat-row-type="product" data-pat-children-lazy="<?php echo ! empty( $row['children_lazy'] ) ? 'true' : 'false'; ?>" data-pat-child-count="<?php echo esc_attr( isset( $row['child_count'] ) ? (int) $row['child_count'] : count( $children ) ); ?>">
 						<td class="check-column">
 							<input type="checkbox" disabled="disabled" />
 						</td>
@@ -66,6 +66,7 @@ $status_options = array(
 										class="button-link pat-row-toggle"
 										aria-expanded="false"
 										data-pat-toggle-children="true"
+										data-pat-parent-id="<?php echo esc_attr( $row_id ); ?>"
 										data-pat-target="<?php echo esc_attr( $row_dom_id ); ?>"
 									>
 										<span class="screen-reader-text"><?php esc_html_e( 'Toggle variations for', 'product-admin-tool' ); ?></span>
@@ -90,6 +91,7 @@ $status_options = array(
 								<?php if ( $can_expand ) : ?>
 									<span class="pat-badge"><?php esc_html_e( 'Variations available', 'product-admin-tool' ); ?></span>
 								<?php endif; ?>
+								<span class="pat-row-status" data-pat-variation-status></span>
 							</div>
 							<div class="pat-row-meta">
 								<span class="pat-row-id"><?php echo esc_html( sprintf( __( 'ID: %d', 'product-admin-tool' ), $row_id ) ); ?></span>
@@ -252,6 +254,6 @@ $status_options = array(
 		</tbody>
 	</table>
 	<p id="pat-grid-caption" class="screen-reader-text">
-		<?php esc_html_e( 'Read-only product and variation grid for future spreadsheet editing.', 'product-admin-tool' ); ?>
+		<?php esc_html_e( 'Product grid with inline parent editing and lazy-loaded variation rows.', 'product-admin-tool' ); ?>
 	</p>
 </div>

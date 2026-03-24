@@ -226,6 +226,12 @@ class PAT_Product_Save_Service {
 			);
 		}
 
+		$sale_price_validation = $this->validate_sale_price_relationship( $product, $changes );
+
+		if ( ! $sale_price_validation['valid'] ) {
+			return $sale_price_validation;
+		}
+
 		return array(
 			'valid'   => true,
 			'errors'  => array(),
@@ -307,6 +313,65 @@ class PAT_Product_Save_Service {
 		return array(
 			'changes' => $sanitized,
 			'errors'  => $errors,
+		);
+	}
+
+	/**
+	 * Validate the relationship between regular and sale price.
+	 *
+	 * @param WC_Product $product Product object.
+	 * @param array      $changes Sanitized changes.
+	 * @return array<string, mixed>
+	 */
+	private function validate_sale_price_relationship( $product, array $changes ): array {
+		if ( ! array_key_exists( 'sale_price', $changes ) ) {
+			return array(
+				'valid'   => true,
+				'errors'  => array(),
+				'message' => '',
+			);
+		}
+
+		$sale_price = $changes['sale_price'];
+
+		if ( '' === $sale_price || null === $sale_price ) {
+			return array(
+				'valid'   => true,
+				'errors'  => array(),
+				'message' => '',
+			);
+		}
+
+		$regular_price = null;
+
+		if ( array_key_exists( 'regular_price', $changes ) ) {
+			$regular_price = $changes['regular_price'];
+		} elseif ( method_exists( $product, 'get_regular_price' ) ) {
+			$regular_price = $product->get_regular_price();
+		}
+
+		if ( '' === $regular_price || null === $regular_price ) {
+			return array(
+				'valid'   => true,
+				'errors'  => array(),
+				'message' => '',
+			);
+		}
+
+		if ( (float) $sale_price > (float) $regular_price ) {
+			return array(
+				'valid'   => false,
+				'errors'  => array(
+					'sale_price' => __( 'Sale price cannot exceed regular price.', 'product-admin-tool' ),
+				),
+				'message' => __( 'Validation failed.', 'product-admin-tool' ),
+			);
+		}
+
+		return array(
+			'valid'   => true,
+			'errors'  => array(),
+			'message' => '',
 		);
 	}
 
