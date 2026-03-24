@@ -54,9 +54,9 @@ $status_options = array(
 						$modified_label = mysql2date( get_option( 'date_format' ), (string) $row['modified'] );
 					}
 					?>
-					<tr class="pat-row pat-parent-row" id="<?php echo esc_attr( $row_dom_id ); ?>" data-pat-row-id="<?php echo esc_attr( $row_id ); ?>" data-pat-row-type="product" data-pat-children-lazy="<?php echo ! empty( $row['children_lazy'] ) ? 'true' : 'false'; ?>" data-pat-child-count="<?php echo esc_attr( isset( $row['child_count'] ) ? (int) $row['child_count'] : count( $children ) ); ?>">
+					<tr class="pat-row pat-parent-row" id="<?php echo esc_attr( $row_dom_id ); ?>" data-pat-row-id="<?php echo esc_attr( $row_id ); ?>" data-pat-row-type="product" data-pat-children-lazy="<?php echo ! empty( $row['children_lazy'] ) ? 'true' : 'false'; ?>" data-pat-child-count="<?php echo esc_attr( isset( $row['child_count'] ) ? (int) $row['child_count'] : count( $children ) ); ?>" tabindex="0" aria-selected="false">
 						<td class="check-column">
-							<input type="checkbox" disabled="disabled" />
+							<input type="checkbox" data-pat-select-row="true" aria-label="<?php echo esc_attr( sprintf( __( 'Select product row %d', 'product-admin-tool' ), $row_id ) ); ?>" />
 						</td>
 						<td class="pat-cell-product">
 							<div class="pat-row-label pat-row-label-wrap">
@@ -215,9 +215,9 @@ $status_options = array(
 						$child_summary = isset( $child['attribute_summary'] ) ? (string) $child['attribute_summary'] : '';
 						$child_label   = '' !== $child_summary ? $child_summary : ( isset( $child['title'] ) ? (string) $child['title'] : __( 'Variation', 'product-admin-tool' ) );
 						?>
-						<tr class="pat-row pat-child-row is-child-row is-hidden" data-pat-parent="<?php echo esc_attr( $row_dom_id ); ?>" data-pat-row-id="<?php echo esc_attr( $child_id ); ?>" data-pat-row-type="variation" hidden>
+						<tr class="pat-row pat-child-row is-child-row is-hidden" data-pat-parent="<?php echo esc_attr( $row_dom_id ); ?>" data-pat-row-id="<?php echo esc_attr( $child_id ); ?>" data-pat-row-type="variation" tabindex="0" aria-selected="false" hidden>
 							<td class="check-column">
-								<input type="checkbox" disabled="disabled" />
+								<input type="checkbox" data-pat-select-row="true" aria-label="<?php echo esc_attr( sprintf( __( 'Select variation row %d', 'product-admin-tool' ), $child_id ) ); ?>" />
 							</td>
 							<td class="pat-cell-product">
 								<div class="pat-row-label pat-row-label-wrap pat-child-label-wrap">

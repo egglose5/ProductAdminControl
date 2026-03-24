@@ -8,7 +8,8 @@ Phase 4 should not jump straight into row generation. The correct order is:
 
 1. fix Phase 3 correctness gaps
 2. implement real lazy-loaded variation expansion
-3. add generated variation row preview and creation
+3. add multi-line row selection behavior
+4. add generated variation row preview and creation
 
 That sequence reduces the risk of building generation logic on top of unstable save and row-state behavior.
 
@@ -68,7 +69,39 @@ Variation fetch response should return:
 
 Generated variation rows belong in the same visual/behavioral space as fetched variation rows. If expansion is not real yet, generated-row UX will be unstable and inconsistent.
 
-## Phase 4C: Generated Variation Row Preview
+## Phase 4C: Multi-Line Row Selection
+
+Goal: introduce spreadsheet-style contiguous row selection that works across parent and loaded variation rows.
+
+### Target Behavior
+
+1. A row click selects one row.
+2. Shift + click selects a contiguous range from the active anchor row.
+3. Ctrl/Cmd + click toggles individual rows without clearing existing selection.
+4. Keyboard shift + arrow extends selection up/down one row at a time.
+5. Selection remains stable when rows are edited and saved.
+
+### Selection Rules
+
+- only currently rendered rows are selectable
+- collapsed variation rows are not part of active selection
+- when a parent is collapsed, child selections under that parent are cleared
+- selection state is independent from dirty/save row state
+- selection styling must be clearly distinct from dirty/error/saved styling
+
+### Frontend Pieces
+
+- enable row checkboxes for interaction instead of disabled placeholders
+- add a client-side selection state manager keyed by row ID
+- support mouse and keyboard range-selection semantics
+- add toolbar selection count output (`selected rows`)
+- preserve selection after variation lazy-load insertion/removal
+
+### Why This Comes Before Generation
+
+Generated rows add more selectable items and future bulk operations depend on trustworthy selection semantics. Building selection first avoids retrofitting generated-row UX later.
+
+## Phase 4D: Generated Variation Row Preview
 
 Goal: calculate and preview missing variation combinations before creation.
 
@@ -100,7 +133,7 @@ Generated rows should start with:
 - attribute summary filled in
 - `draft` or inherited status depending on product strategy
 
-## Phase 4D: Variation Creation Path
+## Phase 4E: Variation Creation Path
 
 Goal: persist generated variation rows safely.
 
@@ -137,12 +170,14 @@ When the save payload includes generated rows:
 - Phase 3 correctness fixes
 - real variation fetch-on-expand
 - variation loading state and cache
+- multi-line contiguous row selection in the grid
 - generated row preview for one parent at a time
 - explicit save/create flow for generated variation rows
 
 ### Out Of Scope
 
 - bulk variation generation across category trees
+- bulk write actions across selected rows
 - advanced generation presets
 - undo/history
 - custom-field generation templates
@@ -162,6 +197,13 @@ When the save payload includes generated rows:
 - remain editable
 - support save feedback
 
+## Selection Model
+
+- selection can include parent rows and visible variation rows
+- anchor row is tracked for shift-range selection
+- selection survives save responses and row rehydration
+- selection count appears in the toolbar for future bulk-action readiness
+
 ## Generated Variation Rows
 
 - appear under the parent alongside existing rows
@@ -176,6 +218,9 @@ When the save payload includes generated rows:
 - `PAT_Save_Controller`
 - `PAT_Variation_Save_Service`
 - `PAT_Product_Grid_Service`
+- admin grid view template for selectable row checkboxes
+- `assets/js/pat-admin.js` for selection state and range behavior
+- `assets/css/pat-admin.css` for selected-row visual state
 
 ### New Classes To Add
 
@@ -262,6 +307,13 @@ Response:
 - controller must pass field-level `errors` to the client
 - server-side sale price validation must compare against persisted regular price if needed
 
+### Selection Rules
+
+- selection must not be lost when edited fields toggle dirty/clean
+- shift-range selection must operate on currently visible row order
+- collapsed child rows must not remain selected
+- lazy-loaded child row insertion must not clear existing parent selection
+
 ### Variation Fetch Rules
 
 - parent ID must exist
@@ -282,9 +334,11 @@ Response:
 2. Add variation fetch endpoint.
 3. Add client-side on-expand fetch and row injection.
 4. Add loaded/cached variation state.
-5. Add generated-row preview logic for one expanded parent.
-6. Add variation creation service and save integration.
-7. Add generated-row state styling and user feedback.
+5. Add multi-line selection state manager and interaction events.
+6. Enable selection checkboxes and selected-row styling.
+7. Add generated-row preview logic for one expanded parent.
+8. Add variation creation service and save integration.
+9. Add generated-row state styling and user feedback.
 
 ## Suggested Subagent Split
 
@@ -294,8 +348,9 @@ When implementation starts, Phase 4 can be split like this:
 2. variation fetch controller
 3. variation row renderer/serializer
 4. client-side lazy expansion and caching
-5. generation service for missing combinations
-6. generated-row UI and save integration
+5. grid selection state manager and keyboard support
+6. generation service for missing combinations
+7. generated-row UI and save integration
 
 ## Definition Of Done
 
@@ -304,6 +359,8 @@ Phase 4 is done when:
 - Phase 3 review findings are fixed
 - variation rows are fetched only when expanded
 - expansion errors are visible and recoverable
+- multi-line contiguous selection works with mouse and keyboard
+- selection remains correct after expand/collapse and save cycles
 - missing variation combinations can be previewed for a parent product
 - generated rows can be saved into real WooCommerce variations
 - duplicate combinations are prevented

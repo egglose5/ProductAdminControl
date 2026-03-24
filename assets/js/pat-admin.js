@@ -4,6 +4,11 @@
 	var ROW_SELECTOR = '[data-pat-row-id]';
 	var FIELD_SELECTOR = '[data-pat-field]';
 	var variationLoadState = Object.create(null);
+	var selectionState = {
+		selectedKeys: Object.create(null),
+		anchorKey: '',
+		focusKey: ''
+	};
 
 	function createVariationState() {
 		return {
@@ -229,6 +234,256 @@
 		return row.getAttribute('data-pat-row-type') || (row.classList.contains('pat-child-row') ? 'variation' : 'product');
 	}
 
+	function getRowSelectionKey(row) {
+		if (!row) {
+			return '';
+		}
+
+		var rowId = row.getAttribute('data-pat-row-id');
+
+		if (!rowId && '0' !== rowId) {
+			return '';
+		}
+
+		return getRowType(row) + ':' + rowId;
+	}
+
+	function rowFromSelectionKey(root, key) {
+		if (!key || !root) {
+			return null;
+		}
+
+		var parts = key.split(':');
+		var rowType = parts[0] || '';
+		var rowId = parts[1] || '';
+
+		if (!rowType || !rowId) {
+			return null;
+		}
+
+		return root.querySelector(ROW_SELECTOR + '[data-pat-row-type="' + rowType + '"][data-pat-row-id="' + rowId + '"]');
+	}
+
+	function isRowVisible(row) {
+		if (!row) {
+			return false;
+		}
+
+		return !row.hidden && !row.classList.contains('is-hidden');
+	}
+
+	function getSelectableRows(root) {
+		var rows = root.querySelectorAll(ROW_SELECTOR);
+
+		return Array.prototype.filter.call(rows, function (row) {
+			return isRowVisible(row);
+		});
+	}
+
+	function getRowSelectCheckbox(row) {
+		if (!row) {
+			return null;
+		}
+
+		return row.querySelector('[data-pat-select-row]');
+	}
+
+	function isRowSelected(row) {
+		var key = getRowSelectionKey(row);
+
+		if (!key) {
+			return false;
+		}
+
+		return !!selectionState.selectedKeys[key];
+	}
+
+	function syncRowSelectionUI(row) {
+		if (!row) {
+			return;
+		}
+
+		var selected = isRowSelected(row);
+		var checkbox = getRowSelectCheckbox(row);
+
+		row.classList.toggle('is-selected', selected);
+		row.setAttribute('aria-selected', selected ? 'true' : 'false');
+
+		if (checkbox) {
+			checkbox.checked = selected;
+		}
+	}
+
+	function setRowSelected(row, selected) {
+		var key = getRowSelectionKey(row);
+
+		if (!key) {
+			return;
+		}
+
+		if (selected) {
+			selectionState.selectedKeys[key] = true;
+		} else {
+			delete selectionState.selectedKeys[key];
+		}
+
+		syncRowSelectionUI(row);
+	}
+
+	function clearSelection(root) {
+		var selectedRows = root.querySelectorAll(ROW_SELECTOR + '.is-selected');
+
+		Array.prototype.forEach.call(selectedRows, function (row) {
+			setRowSelected(row, false);
+		});
+
+		selectionState.selectedKeys = Object.create(null);
+		selectionState.anchorKey = '';
+		selectionState.focusKey = '';
+	}
+
+	function updateSelectedCount(root) {
+		var selectedCountNode = root.querySelector('[data-pat-selected-count]');
+		var selectedRows = root.querySelectorAll(ROW_SELECTOR + '.is-selected');
+		var count = selectedRows.length;
+
+		if (!selectedCountNode) {
+			return;
+		}
+
+		selectedCountNode.textContent = count + (1 === count ? ' selected row' : ' selected rows');
+	}
+
+	function syncSelectionUI(root) {
+		var rows = root.querySelectorAll(ROW_SELECTOR);
+
+		Array.prototype.forEach.call(rows, function (row) {
+			syncRowSelectionUI(row);
+		});
+
+		updateSelectedCount(root);
+	}
+
+	function getSelectionAnchorRow(root, fallbackRow) {
+		var anchorRow = rowFromSelectionKey(root, selectionState.anchorKey);
+
+		if (anchorRow && isRowVisible(anchorRow)) {
+			return anchorRow;
+		}
+
+		if (fallbackRow && isRowVisible(fallbackRow)) {
+			return fallbackRow;
+		}
+
+		var visibleRows = getSelectableRows(root);
+
+		return visibleRows.length ? visibleRows[0] : null;
+	}
+
+	function selectSingleRow(root, row) {
+		if (!row) {
+			return;
+		}
+
+		clearSelection(root);
+		setRowSelected(row, true);
+
+		selectionState.anchorKey = getRowSelectionKey(row);
+		selectionState.focusKey = selectionState.anchorKey;
+		updateSelectedCount(root);
+	}
+
+	function toggleSingleRow(root, row) {
+		if (!row) {
+			return;
+		}
+
+		setRowSelected(row, !isRowSelected(row));
+
+		var key = getRowSelectionKey(row);
+
+		if (!selectionState.anchorKey) {
+			selectionState.anchorKey = key;
+		}
+
+		selectionState.focusKey = key;
+		updateSelectedCount(root);
+	}
+
+	function selectRange(root, anchorRow, targetRow, keepExisting) {
+		if (!anchorRow || !targetRow) {
+			return;
+		}
+
+		var visibleRows = getSelectableRows(root);
+		var start = visibleRows.indexOf(anchorRow);
+		var end = visibleRows.indexOf(targetRow);
+
+		if (-1 === start || -1 === end) {
+			selectSingleRow(root, targetRow);
+			return;
+		}
+
+		if (!keepExisting) {
+			clearSelection(root);
+		}
+
+		if (start > end) {
+			var temp = start;
+			start = end;
+			end = temp;
+		}
+
+		visibleRows.slice(start, end + 1).forEach(function (row) {
+			setRowSelected(row, true);
+		});
+
+		selectionState.anchorKey = getRowSelectionKey(anchorRow);
+		selectionState.focusKey = getRowSelectionKey(targetRow);
+		updateSelectedCount(root);
+	}
+
+	function clearSelectionForRows(root, rows) {
+		rows.forEach(function (row) {
+			setRowSelected(row, false);
+		});
+
+		if (!isRowSelected(rowFromSelectionKey(root, selectionState.anchorKey))) {
+			selectionState.anchorKey = '';
+		}
+
+		if (!isRowSelected(rowFromSelectionKey(root, selectionState.focusKey))) {
+			selectionState.focusKey = '';
+		}
+
+		updateSelectedCount(root);
+	}
+
+	function refreshSelectionAfterDomChange(root) {
+		var knownRows = root.querySelectorAll(ROW_SELECTOR);
+		var knownKeys = Object.create(null);
+
+		Array.prototype.forEach.call(knownRows, function (row) {
+			knownKeys[getRowSelectionKey(row)] = true;
+		});
+
+		Object.keys(selectionState.selectedKeys).forEach(function (key) {
+			if (!knownKeys[key]) {
+				delete selectionState.selectedKeys[key];
+			}
+		});
+
+		if (!knownKeys[selectionState.anchorKey]) {
+			selectionState.anchorKey = '';
+		}
+
+		if (!knownKeys[selectionState.focusKey]) {
+			selectionState.focusKey = '';
+		}
+
+		syncSelectionUI(root);
+	}
+
 	function getRowState(row) {
 		if (!row) {
 			return 'clean';
@@ -382,7 +637,10 @@
 			}
 
 			syncRowState(row);
+			syncRowSelectionUI(row);
 		});
+
+		updateSelectedCount(root);
 	}
 
 	function getDirtyRowElements(root) {
@@ -420,6 +678,8 @@
 			saveStatus.setAttribute('data-pat-save-status', state);
 			saveStatus.textContent = message || (0 === count ? 'No pending changes.' : count + (1 === count ? ' row ready to save.' : ' rows ready to save.'));
 		}
+
+		updateSelectedCount(root);
 
 		root.setAttribute('data-pat-editor-state', state);
 	}
@@ -602,6 +862,88 @@
 		});
 	}
 
+	function bindSelectionEvents(root) {
+		root.addEventListener('click', function (event) {
+			var row = event.target.closest(ROW_SELECTOR);
+
+			if (!row || !root.contains(row)) {
+				return;
+			}
+
+			if (event.target.closest('[data-pat-toggle-children], [data-pat-save-trigger], [data-pat-select-row]')) {
+				return;
+			}
+
+			if (event.shiftKey) {
+				selectRange(root, getSelectionAnchorRow(root, row), row, event.ctrlKey || event.metaKey);
+				return;
+			}
+
+			if (event.ctrlKey || event.metaKey) {
+				toggleSingleRow(root, row);
+				return;
+			}
+
+			selectSingleRow(root, row);
+		});
+
+		root.addEventListener('click', function (event) {
+			var checkbox = event.target.closest('[data-pat-select-row]');
+
+			if (!checkbox || !root.contains(checkbox)) {
+				return;
+			}
+
+			var row = checkbox.closest(ROW_SELECTOR);
+
+			if (!row) {
+				return;
+			}
+
+			event.preventDefault();
+
+			if (event.shiftKey) {
+				selectRange(root, getSelectionAnchorRow(root, row), row, event.ctrlKey || event.metaKey);
+				return;
+			}
+
+			if (event.ctrlKey || event.metaKey) {
+				toggleSingleRow(root, row);
+				return;
+			}
+
+			selectSingleRow(root, row);
+		});
+
+		root.addEventListener('keydown', function (event) {
+			if (!event.shiftKey || ('ArrowDown' !== event.key && 'ArrowUp' !== event.key)) {
+				return;
+			}
+
+			if (event.target.closest(FIELD_SELECTOR)) {
+				return;
+			}
+
+			var currentRow = event.target.closest(ROW_SELECTOR) || rowFromSelectionKey(root, selectionState.focusKey) || rowFromSelectionKey(root, selectionState.anchorKey);
+			var visibleRows = getSelectableRows(root);
+			var currentIndex = visibleRows.indexOf(currentRow);
+
+			if (!visibleRows.length || -1 === currentIndex) {
+				return;
+			}
+
+			var delta = 'ArrowDown' === event.key ? 1 : -1;
+			var nextIndex = currentIndex + delta;
+
+			if (nextIndex < 0 || nextIndex >= visibleRows.length) {
+				return;
+			}
+
+			event.preventDefault();
+			selectRange(root, getSelectionAnchorRow(root, currentRow), visibleRows[nextIndex], false);
+		});
+	}
+
 	function bindSaveToolbar(root) {
 		var saveButton = root.querySelector('[data-pat-save-trigger]');
 
@@ -618,6 +960,7 @@
 	function setUpEditableShell(root) {
 		snapshotEditableFields(root);
 		bindEditableEvents(root);
+		bindSelectionEvents(root);
 		bindSaveToolbar(root);
 		updateToolbar(root, 'idle', 'No pending changes.');
 	}
@@ -690,7 +1033,11 @@
 		}
 	}
 
-	function setHidden(rows, hidden) {
+	function setHidden(root, rows, hidden) {
+		if (hidden) {
+			clearSelectionForRows(root, rows);
+		}
+
 		rows.forEach(function (row) {
 			row.classList.toggle('is-hidden', hidden);
 			row.hidden = hidden;
@@ -720,14 +1067,14 @@
 		if (!showChildren) {
 			updateToggleButton(button, false);
 			parentRow.classList.remove('is-open');
-			setHidden(childRows, true);
+			setHidden(root, childRows, true);
 			return;
 		}
 
 		if (childRows.length) {
 			updateToggleButton(button, true);
 			parentRow.classList.add('is-open');
-			setHidden(childRows, false);
+			setHidden(root, childRows, false);
 			cacheVariationRows(parentId, variationState.rows.length ? variationState.rows : childRows.map(function (row) {
 				return {
 					id: parseInt(row.getAttribute('data-pat-row-id'), 10) || 0,
@@ -740,9 +1087,10 @@
 		if (variationState.loaded && variationState.html) {
 			childRows = insertVariationMarkup(parentRow, variationState.html);
 			snapshotEditableFields(root);
+			refreshSelectionAfterDomChange(root);
 			updateToggleButton(button, true);
 			parentRow.classList.add('is-open');
-			setHidden(childRows, false);
+			setHidden(root, childRows, false);
 			return;
 		}
 
@@ -767,13 +1115,14 @@
 			if (html) {
 				childRows = insertVariationMarkup(parentRow, html);
 				snapshotEditableFields(root);
+				refreshSelectionAfterDomChange(root);
 			} else {
 				childRows = getChildRowsByParentDomId(targetId);
 			}
 
 			updateToggleButton(button, true);
 			parentRow.classList.add('is-open');
-			setHidden(childRows, false);
+			setHidden(root, childRows, false);
 			syncVariationRowState(parentId, {
 				status: 'loaded',
 				message: message

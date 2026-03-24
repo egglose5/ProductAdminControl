@@ -323,6 +323,22 @@
 	box-shadow: inset 3px 0 0 var(--pat-accent);
 }
 
+.pat-admin-shell .pat-grid tr.is-selected,
+.pat-product-editor .pat-grid tr.is-selected {
+	background: rgba(37, 99, 235, 0.08);
+	box-shadow: inset 3px 0 0 #2563eb;
+}
+
+.pat-admin-shell .pat-grid tr.is-selected.is-dirty,
+.pat-product-editor .pat-grid tr.is-selected.is-dirty {
+	background: linear-gradient(90deg, rgba(37, 99, 235, 0.08), rgba(138, 90, 68, 0.08));
+}
+
+.pat-admin-shell .pat-grid tr.is-selected.is-error,
+.pat-product-editor .pat-grid tr.is-selected.is-error {
+	background: linear-gradient(90deg, rgba(37, 99, 235, 0.08), rgba(185, 28, 28, 0.08));
+}
+
 .pat-admin-shell .pat-grid tr.is-saving,
 .pat-product-editor .pat-grid tr.is-saving {
 	background: rgba(138, 90, 68, 0.035);
@@ -374,6 +390,12 @@
 .pat-admin-shell .pat-grid tr.is-child-row td:first-child,
 .pat-product-editor .pat-grid tr.is-child-row td:first-child {
 	padding-left: 26px;
+}
+
+.pat-admin-shell .pat-grid .check-column input[type="checkbox"][data-pat-select-row],
+.pat-product-editor .pat-grid .check-column input[type="checkbox"][data-pat-select-row] {
+	cursor: pointer;
+	margin: 0;
 }
 
 .pat-admin-shell .pat-grid tr.is-hidden,

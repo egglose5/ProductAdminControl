@@ -20,6 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 		<div class="pat-save-meta">
 			<span class="pat-save-state" data-pat-save-status="idle" aria-live="polite"><?php esc_html_e( 'No pending changes.', 'product-admin-tool' ); ?></span>
 			<span class="pat-save-count" data-pat-dirty-count="true"><?php esc_html_e( '0 changed rows', 'product-admin-tool' ); ?></span>
+			<span class="pat-save-count" data-pat-selected-count="true"><?php esc_html_e( '0 selected rows', 'product-admin-tool' ); ?></span>
 		</div>
 		<span class="description"><?php esc_html_e( 'Only dirty rows will be included in the next batch save. Parent product rows are the primary Phase 3 target; variation editing remains scaffolded but secondary.', 'product-admin-tool' ); ?></span>
 	</div>
