@@ -30,10 +30,31 @@ if ( ! defined( 'ABSPATH' ) ) {
 	<?php endif; ?>
 
 	<div class="pat-toolbar pat-action-bar">
-		<button type="button" class="button" disabled="disabled"><?php esc_html_e( 'Bulk Edit', 'product-admin-tool' ); ?></button>
+		<button type="button" class="button" data-pat-bulk-edit-trigger="true" disabled="disabled"><?php esc_html_e( 'Bulk Edit', 'product-admin-tool' ); ?></button>
 		<button type="button" class="button" disabled="disabled"><?php esc_html_e( 'Fill Down', 'product-admin-tool' ); ?></button>
 		<button type="button" class="button" disabled="disabled"><?php esc_html_e( 'Generate Variations', 'product-admin-tool' ); ?></button>
-		<span class="description"><?php esc_html_e( 'Bulk actions remain disabled. Variation preview generation is being added behind the scenes, but the first Phase 4 focus is hardening and lazy loading.', 'product-admin-tool' ); ?></span>
+		<span class="description"><?php esc_html_e( 'Select rows to use Bulk Edit. Fill Down and Generate Variations are scheduled for later phases.', 'product-admin-tool' ); ?></span>
+	</div>
+
+	<div class="pat-toolbar pat-bulk-edit-bar" data-pat-bulk-edit-bar="true" hidden aria-label="<?php esc_attr_e( 'Bulk edit selected rows', 'product-admin-tool' ); ?>">
+		<strong class="pat-bulk-edit-label"><?php esc_html_e( 'Bulk edit', 'product-admin-tool' ); ?> <span data-pat-bulk-edit-row-count>0 <?php esc_html_e( 'rows', 'product-admin-tool' ); ?></span>:</strong>
+		<select class="pat-bulk-edit-field" data-pat-bulk-field-select aria-label="<?php esc_attr_e( 'Field to bulk edit', 'product-admin-tool' ); ?>">
+			<option value=""><?php esc_html_e( '— Select field —', 'product-admin-tool' ); ?></option>
+			<option value="status"><?php esc_html_e( 'Status', 'product-admin-tool' ); ?></option>
+			<option value="regular_price"><?php esc_html_e( 'Regular Price', 'product-admin-tool' ); ?></option>
+			<option value="sale_price"><?php esc_html_e( 'Sale Price', 'product-admin-tool' ); ?></option>
+			<option value="stock_quantity"><?php esc_html_e( 'Stock Quantity', 'product-admin-tool' ); ?></option>
+			<option value="menu_order"><?php esc_html_e( 'Menu Order', 'product-admin-tool' ); ?></option>
+		</select>
+		<select class="pat-bulk-edit-value-status" data-pat-bulk-value-status style="display:none" aria-label="<?php esc_attr_e( 'Status value', 'product-admin-tool' ); ?>">
+			<option value="publish"><?php esc_html_e( 'Published', 'product-admin-tool' ); ?></option>
+			<option value="draft"><?php esc_html_e( 'Draft', 'product-admin-tool' ); ?></option>
+			<option value="pending"><?php esc_html_e( 'Pending Review', 'product-admin-tool' ); ?></option>
+			<option value="private"><?php esc_html_e( 'Private', 'product-admin-tool' ); ?></option>
+		</select>
+		<input type="text" class="regular-text pat-bulk-edit-value-text" data-pat-bulk-value-text style="display:none" placeholder="<?php esc_attr_e( 'Value...', 'product-admin-tool' ); ?>" aria-label="<?php esc_attr_e( 'Bulk edit value', 'product-admin-tool' ); ?>" />
+		<button type="button" class="button button-primary" data-pat-bulk-apply="true"><?php esc_html_e( 'Apply to selection', 'product-admin-tool' ); ?></button>
+		<button type="button" class="button" data-pat-bulk-cancel="true"><?php esc_html_e( 'Cancel', 'product-admin-tool' ); ?></button>
 	</div>
 
 	<?php if ( $grid_table instanceof PAT_Product_Grid_Table ) : ?>

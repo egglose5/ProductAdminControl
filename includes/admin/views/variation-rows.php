@@ -14,9 +14,9 @@ $has_rows = ! empty( $rows );
 		$child_summary = isset( $child['attribute_summary'] ) ? (string) $child['attribute_summary'] : '';
 		$child_label   = '' !== $child_summary ? $child_summary : ( isset( $child['title'] ) ? (string) $child['title'] : __( 'Variation', 'product-admin-tool' ) );
 		?>
-		<tr class="pat-row pat-child-row is-child-row is-hidden" data-pat-parent="<?php echo esc_attr( $parent_dom_id ); ?>" data-pat-row-id="<?php echo esc_attr( $child_id ); ?>" data-pat-row-type="variation" hidden>
+		<tr class="pat-row pat-child-row is-child-row is-hidden" data-pat-parent="<?php echo esc_attr( $parent_dom_id ); ?>" data-pat-row-id="<?php echo esc_attr( $child_id ); ?>" data-pat-row-type="variation" tabindex="0" aria-selected="false" hidden>
 			<td class="check-column">
-				<input type="checkbox" disabled="disabled" />
+				<input type="checkbox" data-pat-select-row="true" aria-label="<?php echo esc_attr( sprintf( __( 'Select variation row %d', 'product-admin-tool' ), $child_id ) ); ?>" />
 			</td>
 			<td class="pat-cell-product">
 				<div class="pat-row-label pat-row-label-wrap pat-child-label-wrap">

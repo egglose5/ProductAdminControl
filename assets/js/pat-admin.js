@@ -347,11 +347,11 @@
 		var selectedRows = root.querySelectorAll(ROW_SELECTOR + '.is-selected');
 		var count = selectedRows.length;
 
-		if (!selectedCountNode) {
-			return;
+		if (selectedCountNode) {
+			selectedCountNode.textContent = count + (1 === count ? ' selected row' : ' selected rows');
 		}
 
-		selectedCountNode.textContent = count + (1 === count ? ' selected row' : ' selected rows');
+		updateBulkEditBar(root);
 	}
 
 	function syncSelectionUI(root) {
@@ -735,10 +735,29 @@
 
 			field.setAttribute('data-pat-original-value', toStringValue(newValue));
 			field.classList.remove('is-dirty');
+			field.classList.remove('is-field-error');
+			field.removeAttribute('title');
 			field.setAttribute('data-pat-field-state', 'clean');
 		});
 
 		setRowState(row, 'saved', result && result.message ? result.message : 'Saved');
+	}
+
+	function applyFieldErrors(row, errors) {
+		if (!row || !errors || 'object' !== typeof errors) {
+			return;
+		}
+
+		Object.keys(errors).forEach(function (fieldName) {
+			var field = row.querySelector(FIELD_SELECTOR + '[data-pat-field="' + fieldName + '"]');
+
+			if (!field) {
+				return;
+			}
+
+			field.classList.add('is-field-error');
+			field.title = toStringValue(errors[fieldName]);
+		});
 	}
 
 	function applySaveResults(root, response, requestRows) {
@@ -768,6 +787,7 @@
 			}
 
 			setRowErrorState(row, result && result.message ? result.message : payload && payload.message ? payload.message : 'Save failed.');
+			applyFieldErrors(row, result && result.errors ? result.errors : {});
 		});
 
 		if (payload && payload.success) {
@@ -857,6 +877,34 @@
 			}
 
 			ensureOriginalValue(field);
+			updateFieldState(field);
+			updateToolbar(root, getEditorState(root));
+		});
+
+		root.addEventListener('keydown', function (event) {
+			if ('Escape' !== event.key) {
+				return;
+			}
+
+			var field = event.target.closest(FIELD_SELECTOR);
+
+			if (!field || !root.contains(field)) {
+				return;
+			}
+
+			event.preventDefault();
+			var originalValue = field.hasAttribute('data-pat-original-value') ? field.getAttribute('data-pat-original-value') : readFieldValue(field);
+
+			if (field.isContentEditable) {
+				field.textContent = originalValue;
+			} else if ('value' in field) {
+				field.value = originalValue;
+			} else {
+				field.setAttribute('data-pat-value', originalValue);
+			}
+
+			field.classList.remove('is-field-error');
+			field.removeAttribute('title');
 			updateFieldState(field);
 			updateToolbar(root, getEditorState(root));
 		});
@@ -957,10 +1005,192 @@
 		});
 	}
 
+	function updateBulkEditBar(root) {
+		var trigger = root.querySelector('[data-pat-bulk-edit-trigger]');
+		var selectedRows = root.querySelectorAll(ROW_SELECTOR + '.is-selected');
+		var count = selectedRows.length;
+
+		if (trigger) {
+			trigger.disabled = (0 === count);
+		}
+
+		var bar = root.querySelector('[data-pat-bulk-edit-bar]');
+
+		if (!bar) {
+			return;
+		}
+
+		var countLabel = bar.querySelector('[data-pat-bulk-edit-row-count]');
+
+		if (countLabel) {
+			countLabel.textContent = count + (1 === count ? ' row' : ' rows');
+		}
+	}
+
+	function openBulkEditBar(root) {
+		var bar = root.querySelector('[data-pat-bulk-edit-bar]');
+
+		if (!bar) {
+			return;
+		}
+
+		bar.hidden = false;
+		updateBulkEditBar(root);
+	}
+
+	function closeBulkEditBar(root) {
+		var bar = root.querySelector('[data-pat-bulk-edit-bar]');
+
+		if (!bar) {
+			return;
+		}
+
+		bar.hidden = true;
+
+		var fieldSelect = bar.querySelector('[data-pat-bulk-field-select]');
+		var statusSelect = bar.querySelector('[data-pat-bulk-value-status]');
+		var textInput = bar.querySelector('[data-pat-bulk-value-text]');
+
+		if (fieldSelect) {
+			fieldSelect.value = '';
+		}
+
+		if (statusSelect) {
+			statusSelect.style.display = 'none';
+		}
+
+		if (textInput) {
+			textInput.style.display = 'none';
+			textInput.value = '';
+		}
+	}
+
+	function applyBulkEdit(root) {
+		var bar = root.querySelector('[data-pat-bulk-edit-bar]');
+
+		if (!bar) {
+			return;
+		}
+
+		var fieldSelect = bar.querySelector('[data-pat-bulk-field-select]');
+
+		if (!fieldSelect || !fieldSelect.value) {
+			return;
+		}
+
+		var fieldName = fieldSelect.value;
+		var value = '';
+
+		if ('status' === fieldName) {
+			var statusSelect = bar.querySelector('[data-pat-bulk-value-status]');
+			value = statusSelect ? statusSelect.value : '';
+		} else {
+			var textInput = bar.querySelector('[data-pat-bulk-value-text]');
+			value = textInput ? textInput.value : '';
+		}
+
+		var selectedRows = root.querySelectorAll(ROW_SELECTOR + '.is-selected');
+
+		Array.prototype.forEach.call(selectedRows, function (row) {
+			if (row.hidden || row.classList.contains('is-hidden')) {
+				return;
+			}
+
+			var field = row.querySelector(FIELD_SELECTOR + '[data-pat-field="' + fieldName + '"]');
+
+			if (!field) {
+				return;
+			}
+
+			if ('value' in field) {
+				field.value = value;
+			} else if (field.isContentEditable) {
+				field.textContent = value;
+			}
+
+			ensureOriginalValue(field);
+			updateFieldState(field);
+		});
+
+		updateToolbar(root, getEditorState(root));
+		closeBulkEditBar(root);
+	}
+
+	function bindBulkEditEvents(root) {
+		var trigger = root.querySelector('[data-pat-bulk-edit-trigger]');
+
+		if (trigger) {
+			trigger.addEventListener('click', function (event) {
+				event.preventDefault();
+				openBulkEditBar(root);
+			});
+		}
+
+		root.addEventListener('click', function (event) {
+			if (event.target.closest('[data-pat-bulk-cancel]') && root.contains(event.target)) {
+				closeBulkEditBar(root);
+			}
+
+			if (event.target.closest('[data-pat-bulk-apply]') && root.contains(event.target)) {
+				applyBulkEdit(root);
+			}
+		});
+
+		root.addEventListener('change', function (event) {
+			var fieldSelect = event.target.closest('[data-pat-bulk-field-select]');
+
+			if (!fieldSelect || !root.contains(fieldSelect)) {
+				return;
+			}
+
+			var bar = fieldSelect.closest('[data-pat-bulk-edit-bar]');
+
+			if (!bar) {
+				return;
+			}
+
+			var fieldName = fieldSelect.value;
+			var statusSelect = bar.querySelector('[data-pat-bulk-value-status]');
+			var textInput = bar.querySelector('[data-pat-bulk-value-text]');
+
+			if ('status' === fieldName) {
+				if (statusSelect) {
+					statusSelect.style.display = '';
+				}
+
+				if (textInput) {
+					textInput.style.display = 'none';
+				}
+			} else if (fieldName) {
+				if (statusSelect) {
+					statusSelect.style.display = 'none';
+				}
+
+				if (textInput) {
+					var isNumeric = ('regular_price' === fieldName || 'sale_price' === fieldName || 'stock_quantity' === fieldName || 'menu_order' === fieldName);
+					textInput.type = isNumeric ? 'number' : 'text';
+					textInput.step = ('regular_price' === fieldName || 'sale_price' === fieldName) ? '0.01' : '1';
+					textInput.value = '';
+					textInput.style.display = '';
+					textInput.focus();
+				}
+			} else {
+				if (statusSelect) {
+					statusSelect.style.display = 'none';
+				}
+
+				if (textInput) {
+					textInput.style.display = 'none';
+				}
+			}
+		});
+	}
+
 	function setUpEditableShell(root) {
 		snapshotEditableFields(root);
 		bindEditableEvents(root);
 		bindSelectionEvents(root);
+		bindBulkEditEvents(root);
 		bindSaveToolbar(root);
 		updateToolbar(root, 'idle', 'No pending changes.');
 	}
