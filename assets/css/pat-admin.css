@@ -1,0 +1,64 @@
+:root {
+	--pat-bg: #f6f4ef;
+	--pat-surface: #ffffff;
+	--pat-border: #d7d0c6;
+	--pat-text: #1f2328;
+	--pat-muted: #6b7280;
+	--pat-accent: #8a5a44;
+}
+
+.wrap.pat-admin-shell {
+	max-width: 1320px;
+}
+
+.pat-admin-shell .pat-toolbar,
+.pat-admin-shell .pat-grid-shell {
+	background: var(--pat-surface);
+	border: 1px solid var(--pat-border);
+	border-radius: 14px;
+	box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.pat-admin-shell .pat-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	align-items: center;
+	padding: 16px 18px;
+	margin: 16px 0;
+}
+
+.pat-admin-shell .pat-toolbar__title {
+	margin: 0;
+	color: var(--pat-text);
+	font-size: 16px;
+	font-weight: 600;
+}
+
+.pat-admin-shell .pat-toolbar__note {
+	margin: 0;
+	color: var(--pat-muted);
+	font-size: 13px;
+}
+
+.pat-admin-shell .pat-grid-shell {
+	overflow: auto;
+}
+
+.pat-admin-shell .pat-grid-placeholder {
+	padding: 24px 18px;
+	color: var(--pat-muted);
+}
+
+.pat-admin-shell .pat-badge {
+	display: inline-flex;
+	align-items: center;
+	padding: 4px 10px;
+	border-radius: 999px;
+	background: rgba(138, 90, 68, 0.12);
+	color: var(--pat-accent);
+	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+}
