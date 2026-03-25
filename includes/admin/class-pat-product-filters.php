@@ -43,6 +43,15 @@ class PAT_Product_Filters {
 	}
 
 	/**
+	 * Get the current product category filter slug.
+	 *
+	 * @return string
+	 */
+	public function get_category_filter(): string {
+		return sanitize_title( $this->get_request_string( 'category' ) );
+	}
+
+	/**
 	 * Get the current page size.
 	 *
 	 * @return int
@@ -85,6 +94,44 @@ class PAT_Product_Filters {
 			'pending'  => __( 'Pending review', 'product-admin-tool' ),
 			'private' => __( 'Private', 'product-admin-tool' ),
 		);
+	}
+
+	/**
+	 * Return the available product category options keyed by term slug.
+	 *
+	 * @return array<string, string>
+	 */
+	public function get_category_options(): array {
+		$options = array(
+			'' => __( 'All categories', 'product-admin-tool' ),
+		);
+
+		if ( ! taxonomy_exists( 'product_cat' ) ) {
+			return $options;
+		}
+
+		$terms = get_terms(
+			array(
+				'taxonomy'   => 'product_cat',
+				'hide_empty' => false,
+				'orderby'    => 'name',
+				'order'      => 'ASC',
+			)
+		);
+
+		if ( is_wp_error( $terms ) || empty( $terms ) ) {
+			return $options;
+		}
+
+		foreach ( $terms as $term ) {
+			if ( ! $term instanceof WP_Term ) {
+				continue;
+			}
+
+			$options[ (string) $term->slug ] = (string) $term->name;
+		}
+
+		return $options;
 	}
 
 	/**
@@ -135,6 +182,7 @@ class PAT_Product_Filters {
 			'paged'    => $page,
 			's'        => $this->get_search_term(),
 			'status'   => $this->get_status_filter(),
+			'category' => $this->get_category_filter(),
 			'per_page' => $this->get_per_page(),
 		);
 

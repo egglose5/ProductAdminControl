@@ -40,10 +40,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 		<strong class="pat-bulk-edit-label"><?php esc_html_e( 'Bulk edit', 'product-admin-tool' ); ?> <span data-pat-bulk-edit-row-count>0 <?php esc_html_e( 'rows', 'product-admin-tool' ); ?></span>:</strong>
 		<select class="pat-bulk-edit-field" data-pat-bulk-field-select aria-label="<?php esc_attr_e( 'Field to bulk edit', 'product-admin-tool' ); ?>">
 			<option value=""><?php esc_html_e( '— Select field —', 'product-admin-tool' ); ?></option>
+			<option value="title"><?php esc_html_e( 'Title', 'product-admin-tool' ); ?></option>
+			<option value="sku"><?php esc_html_e( 'SKU', 'product-admin-tool' ); ?></option>
 			<option value="status"><?php esc_html_e( 'Status', 'product-admin-tool' ); ?></option>
 			<option value="regular_price"><?php esc_html_e( 'Regular Price', 'product-admin-tool' ); ?></option>
 			<option value="sale_price"><?php esc_html_e( 'Sale Price', 'product-admin-tool' ); ?></option>
 			<option value="stock_quantity"><?php esc_html_e( 'Stock Quantity', 'product-admin-tool' ); ?></option>
+			<option value="weight"><?php esc_html_e( 'Weight', 'product-admin-tool' ); ?></option>
+			<option value="length"><?php esc_html_e( 'Length', 'product-admin-tool' ); ?></option>
+			<option value="width"><?php esc_html_e( 'Width', 'product-admin-tool' ); ?></option>
+			<option value="height"><?php esc_html_e( 'Height', 'product-admin-tool' ); ?></option>
 			<option value="menu_order"><?php esc_html_e( 'Menu Order', 'product-admin-tool' ); ?></option>
 		</select>
 		<select class="pat-bulk-edit-value-status" data-pat-bulk-value-status style="display:none" aria-label="<?php esc_attr_e( 'Status value', 'product-admin-tool' ); ?>">

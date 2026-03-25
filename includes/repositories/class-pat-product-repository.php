@@ -16,6 +16,7 @@ class PAT_Product_Repository {
 	 * - per_page: int
 	 * - search: string
 	 * - status: string|array
+	 * - category: string (product_cat slug)
 	 *
 	 * @param array $args Query arguments.
 	 * @return array
@@ -33,6 +34,7 @@ class PAT_Product_Repository {
 				'filters'    => array(
 					'search' => isset( $args['search'] ) ? sanitize_text_field( wp_unslash( $args['search'] ) ) : '',
 					'status' => $this->normalize_status_filter( $args['status'] ?? '' ),
+					'category' => isset( $args['category'] ) ? sanitize_title( wp_unslash( (string) $args['category'] ) ) : '',
 				),
 			);
 		}
@@ -58,6 +60,7 @@ class PAT_Product_Repository {
 					'filters'    => array(
 						'search' => $query_args['search'],
 						'status' => $query_args['status'],
+						'category' => $query_args['category'],
 					),
 				);
 			}
@@ -96,6 +99,7 @@ class PAT_Product_Repository {
 			'filters'    => array(
 				'search' => $query_args['search'],
 				'status' => $query_args['status'],
+				'category' => $query_args['category'],
 			),
 		);
 	}
@@ -111,12 +115,14 @@ class PAT_Product_Repository {
 		$per_page = isset( $args['per_page'] ) ? max( 1, absint( $args['per_page'] ) ) : 20;
 		$search   = isset( $args['search'] ) ? sanitize_text_field( wp_unslash( $args['search'] ) ) : '';
 		$status   = $this->normalize_status_filter( $args['status'] ?? '' );
+		$category = isset( $args['category'] ) ? sanitize_title( wp_unslash( (string) $args['category'] ) ) : '';
 
 		return array(
 			'page'     => $page,
 			'per_page' => $per_page,
 			'search'   => $search,
 			'status'   => $status,
+			'category' => $category,
 		);
 	}
 
@@ -145,6 +151,16 @@ class PAT_Product_Repository {
 
 		if ( '' !== $args['search'] ) {
 			$query_args['s'] = $args['search'];
+		}
+
+		if ( '' !== $args['category'] ) {
+			$query_args['tax_query'] = array(
+				array(
+					'taxonomy' => 'product_cat',
+					'field'    => 'slug',
+					'terms'    => $args['category'],
+				),
+			);
 		}
 
 		return $query_args;
@@ -318,6 +334,11 @@ class PAT_Product_Repository {
 			'price'          => $this->format_price( $product->get_price() ),
 			'stock_status'   => $product->get_stock_status(),
 			'stock_quantity' => $product->get_stock_quantity(),
+			'weight'         => method_exists( $product, 'get_weight' ) ? (string) $product->get_weight() : '',
+			'length'         => method_exists( $product, 'get_length' ) ? (string) $product->get_length() : '',
+			'width'          => method_exists( $product, 'get_width' ) ? (string) $product->get_width() : '',
+			'height'         => method_exists( $product, 'get_height' ) ? (string) $product->get_height() : '',
+			'shipping_class_id' => method_exists( $product, 'get_shipping_class_id' ) ? (int) $product->get_shipping_class_id() : 0,
 			'menu_order'     => (int) $product->get_menu_order(),
 			'categories'     => array_values( array_filter( array_map( 'strval', (array) $term_names ) ) ),
 			'has_children'   => $product->is_type( 'variable' ),

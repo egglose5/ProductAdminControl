@@ -21,7 +21,7 @@ class PAT_Row_Validation {
 			return array( 'sku', 'status', 'regular_price', 'sale_price', 'stock_quantity', 'menu_order' );
 		}
 
-		return array( 'title', 'sku', 'status', 'regular_price', 'sale_price', 'stock_quantity', 'menu_order' );
+		return array( 'title', 'sku', 'status', 'regular_price', 'sale_price', 'stock_quantity', 'weight', 'length', 'width', 'height', 'shipping_class_id', 'menu_order' );
 	}
 
 	/**
@@ -147,6 +147,31 @@ class PAT_Row_Validation {
 				if ( null === $value ) {
 					return array(
 						'error' => __( 'Stock quantity must be an integer.', 'product-admin-tool' ),
+					);
+				}
+
+				return array( 'value' => $value );
+
+			case 'weight':
+			case 'length':
+			case 'width':
+			case 'height':
+				$value = self::sanitize_decimal( $value );
+
+				if ( null === $value ) {
+					return array(
+						'error' => __( 'Shipping dimensions and weight must be numeric.', 'product-admin-tool' ),
+					);
+				}
+
+				return array( 'value' => $value );
+
+			case 'shipping_class_id':
+				$value = self::sanitize_integer_or_empty( $value );
+
+				if ( null === $value ) {
+					return array(
+						'error' => __( 'Shipping class must be a valid ID.', 'product-admin-tool' ),
 					);
 				}
 

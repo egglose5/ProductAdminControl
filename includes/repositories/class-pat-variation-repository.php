@@ -72,7 +72,10 @@ class PAT_Variation_Repository {
 		$parent_id = (int) $post->post_parent;
 		$sku       = '';
 		$price     = '';
+		$regular_price = '';
+		$sale_price = '';
 		$stock     = '';
+		$menu_order = (int) $post->menu_order;
 		$status    = $post->post_status;
 		$summary   = $this->build_attribute_summary( $post, $product );
 
@@ -85,6 +88,14 @@ class PAT_Variation_Repository {
 				$price = (string) $product->get_price();
 			}
 
+			if ( method_exists( $product, 'get_regular_price' ) ) {
+				$regular_price = (string) $product->get_regular_price();
+			}
+
+			if ( method_exists( $product, 'get_sale_price' ) ) {
+				$sale_price = (string) $product->get_sale_price();
+			}
+
 			if ( method_exists( $product, 'get_stock_quantity' ) ) {
 				$stock_quantity = $product->get_stock_quantity();
 				$stock          = null === $stock_quantity ? '' : (string) $stock_quantity;
@@ -93,9 +104,15 @@ class PAT_Variation_Repository {
 			if ( method_exists( $product, 'get_status' ) ) {
 				$status = (string) $product->get_status();
 			}
+
+			if ( method_exists( $product, 'get_menu_order' ) ) {
+				$menu_order = (int) $product->get_menu_order();
+			}
 		} else {
 			$sku   = (string) get_post_meta( $post->ID, '_sku', true );
 			$price = (string) get_post_meta( $post->ID, '_price', true );
+			$regular_price = (string) get_post_meta( $post->ID, '_regular_price', true );
+			$sale_price    = (string) get_post_meta( $post->ID, '_sale_price', true );
 
 			$stock_quantity = get_post_meta( $post->ID, '_stock', true );
 			$stock          = '' === $stock_quantity ? '' : (string) $stock_quantity;
@@ -110,6 +127,9 @@ class PAT_Variation_Repository {
 			'stock'            => $stock,
 			'status'           => $status,
 			'price'            => $price,
+			'regular_price'    => $regular_price,
+			'sale_price'       => $sale_price,
+			'menu_order'       => $menu_order,
 			'attribute_summary' => $summary,
 		);
 	}

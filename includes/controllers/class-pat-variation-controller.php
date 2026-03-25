@@ -241,7 +241,9 @@ class PAT_Variation_Controller {
 
 		$sku    = isset( $row['sku'] ) ? (string) $row['sku'] : '';
 		$price  = isset( $row['price'] ) ? (string) $row['price'] : '';
-		$stock  = isset( $row['stock'] ) ? (string) $row['stock'] : '';
+		$regular_price = isset( $row['regular_price'] ) ? (string) $row['regular_price'] : $price;
+		$sale_price = isset( $row['sale_price'] ) ? (string) $row['sale_price'] : '';
+		$stock  = isset( $row['stock_quantity'] ) ? (string) $row['stock_quantity'] : ( isset( $row['stock'] ) ? (string) $row['stock'] : '' );
 		$status = isset( $row['status'] ) ? (string) $row['status'] : '';
 
 		$normalized = array(
@@ -254,7 +256,10 @@ class PAT_Variation_Controller {
 			'attribute_summary' => isset( $row['attribute_summary'] ) ? (string) $row['attribute_summary'] : $summary,
 			'sku'              => $sku,
 			'price'            => $price,
+			'regular_price'    => $regular_price,
+			'sale_price'       => $sale_price,
 			'stock'            => $stock,
+			'stock_quantity'   => $stock,
 			'status'           => $status,
 			'menu_order'       => isset( $row['menu_order'] ) ? (int) $row['menu_order'] : 0,
 			'child_rows'       => array(),

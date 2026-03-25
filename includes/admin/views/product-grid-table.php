@@ -11,6 +11,30 @@ $status_options = array(
 	'pending' => __( 'Pending review', 'product-admin-tool' ),
 	'private' => __( 'Private', 'product-admin-tool' ),
 );
+$shipping_class_options = array(
+	0 => __( 'No shipping class', 'product-admin-tool' ),
+);
+
+if ( taxonomy_exists( 'product_shipping_class' ) ) {
+	$shipping_class_terms = get_terms(
+		array(
+			'taxonomy'   => 'product_shipping_class',
+			'hide_empty' => false,
+			'orderby'    => 'name',
+			'order'      => 'ASC',
+		)
+	);
+
+	if ( ! is_wp_error( $shipping_class_terms ) && ! empty( $shipping_class_terms ) ) {
+		foreach ( $shipping_class_terms as $shipping_class_term ) {
+			if ( ! $shipping_class_term instanceof WP_Term ) {
+				continue;
+			}
+
+			$shipping_class_options[ (int) $shipping_class_term->term_id ] = (string) $shipping_class_term->name;
+		}
+	}
+}
 ?>
 <div class="pat-grid-shell">
 	<table class="widefat fixed striped pat-grid" aria-describedby="pat-grid-caption">
@@ -41,6 +65,11 @@ $status_options = array(
 					$sale_price_value    = isset( $row['sale_price'] ) ? (string) $row['sale_price'] : '';
 					$sku_value           = isset( $row['sku'] ) ? (string) $row['sku'] : '';
 					$status_value        = isset( $row['status'] ) ? (string) $row['status'] : '';
+					$weight_value        = isset( $row['weight'] ) ? (string) $row['weight'] : '';
+					$length_value        = isset( $row['length'] ) ? (string) $row['length'] : '';
+					$width_value         = isset( $row['width'] ) ? (string) $row['width'] : '';
+					$height_value        = isset( $row['height'] ) ? (string) $row['height'] : '';
+					$shipping_class_id_value = isset( $row['shipping_class_id'] ) ? (string) absint( $row['shipping_class_id'] ) : '0';
 					$menu_order_value    = isset( $row['menu_order'] ) ? (string) $row['menu_order'] : '0';
 					$row_state_label     = '';
 
@@ -100,6 +129,7 @@ $status_options = array(
 								<?php endif; ?>
 							</div>
 						</td>
+						<td><?php echo '' !== $categories ? esc_html( $categories ) : '-'; ?></td>
 						<td><?php echo esc_html( $product_type ); ?></td>
 						<td>
 							<label class="screen-reader-text" for="<?php echo esc_attr( 'pat-sku-' . $row_id ); ?>"><?php esc_html_e( 'SKU', 'product-admin-tool' ); ?></label>
@@ -182,6 +212,90 @@ $status_options = array(
 						</td>
 						<td>
 							<div class="pat-inline-field-group">
+								<label class="screen-reader-text" for="<?php echo esc_attr( 'pat-weight-' . $row_id ); ?>"><?php esc_html_e( 'Weight', 'product-admin-tool' ); ?></label>
+								<input
+									id="<?php echo esc_attr( 'pat-weight-' . $row_id ); ?>"
+									class="pat-inline-field pat-inline-price"
+									type="number"
+									step="0.01"
+									inputmode="decimal"
+									value="<?php echo esc_attr( $weight_value ); ?>"
+									data-pat-row-id="<?php echo esc_attr( $row_id ); ?>"
+									data-pat-row-type="product"
+									data-pat-field="weight"
+									data-pat-original-value="<?php echo esc_attr( $weight_value ); ?>"
+								/>
+								<span class="pat-inline-label"><?php esc_html_e( 'Weight', 'product-admin-tool' ); ?></span>
+							</div>
+							<div class="pat-inline-field-group">
+								<label class="screen-reader-text" for="<?php echo esc_attr( 'pat-length-' . $row_id ); ?>"><?php esc_html_e( 'Length', 'product-admin-tool' ); ?></label>
+								<input
+									id="<?php echo esc_attr( 'pat-length-' . $row_id ); ?>"
+									class="pat-inline-field pat-inline-price"
+									type="number"
+									step="0.01"
+									inputmode="decimal"
+									value="<?php echo esc_attr( $length_value ); ?>"
+									data-pat-row-id="<?php echo esc_attr( $row_id ); ?>"
+									data-pat-row-type="product"
+									data-pat-field="length"
+									data-pat-original-value="<?php echo esc_attr( $length_value ); ?>"
+								/>
+								<span class="pat-inline-label"><?php esc_html_e( 'L', 'product-admin-tool' ); ?></span>
+							</div>
+							<div class="pat-inline-field-group">
+								<label class="screen-reader-text" for="<?php echo esc_attr( 'pat-width-' . $row_id ); ?>"><?php esc_html_e( 'Width', 'product-admin-tool' ); ?></label>
+								<input
+									id="<?php echo esc_attr( 'pat-width-' . $row_id ); ?>"
+									class="pat-inline-field pat-inline-price"
+									type="number"
+									step="0.01"
+									inputmode="decimal"
+									value="<?php echo esc_attr( $width_value ); ?>"
+									data-pat-row-id="<?php echo esc_attr( $row_id ); ?>"
+									data-pat-row-type="product"
+									data-pat-field="width"
+									data-pat-original-value="<?php echo esc_attr( $width_value ); ?>"
+								/>
+								<span class="pat-inline-label"><?php esc_html_e( 'W', 'product-admin-tool' ); ?></span>
+							</div>
+							<div class="pat-inline-field-group">
+								<label class="screen-reader-text" for="<?php echo esc_attr( 'pat-height-' . $row_id ); ?>"><?php esc_html_e( 'Height', 'product-admin-tool' ); ?></label>
+								<input
+									id="<?php echo esc_attr( 'pat-height-' . $row_id ); ?>"
+									class="pat-inline-field pat-inline-price"
+									type="number"
+									step="0.01"
+									inputmode="decimal"
+									value="<?php echo esc_attr( $height_value ); ?>"
+									data-pat-row-id="<?php echo esc_attr( $row_id ); ?>"
+									data-pat-row-type="product"
+									data-pat-field="height"
+									data-pat-original-value="<?php echo esc_attr( $height_value ); ?>"
+								/>
+								<span class="pat-inline-label"><?php esc_html_e( 'H', 'product-admin-tool' ); ?></span>
+							</div>
+							<div class="pat-inline-field-group">
+								<label class="screen-reader-text" for="<?php echo esc_attr( 'pat-shipping-class-' . $row_id ); ?>"><?php esc_html_e( 'Shipping class', 'product-admin-tool' ); ?></label>
+								<select
+									id="<?php echo esc_attr( 'pat-shipping-class-' . $row_id ); ?>"
+									class="pat-inline-field pat-inline-status"
+									data-pat-row-id="<?php echo esc_attr( $row_id ); ?>"
+									data-pat-row-type="product"
+									data-pat-field="shipping_class_id"
+									data-pat-original-value="<?php echo esc_attr( $shipping_class_id_value ); ?>"
+								>
+									<?php foreach ( $shipping_class_options as $shipping_class_id => $shipping_class_label ) : ?>
+										<option value="<?php echo esc_attr( (string) $shipping_class_id ); ?>" <?php selected( $shipping_class_id_value, (string) $shipping_class_id ); ?>>
+											<?php echo esc_html( $shipping_class_label ); ?>
+										</option>
+									<?php endforeach; ?>
+								</select>
+								<span class="pat-inline-label"><?php esc_html_e( 'Class', 'product-admin-tool' ); ?></span>
+							</div>
+						</td>
+						<td>
+							<div class="pat-inline-field-group">
 								<label class="screen-reader-text" for="<?php echo esc_attr( 'pat-menu-order-' . $row_id ); ?>"><?php esc_html_e( 'Menu order', 'product-admin-tool' ); ?></label>
 								<input
 									id="<?php echo esc_attr( 'pat-menu-order-' . $row_id ); ?>"
@@ -231,11 +345,13 @@ $status_options = array(
 									<?php endif; ?>
 								</div>
 							</td>
+							<td>&mdash;</td>
 							<td><?php esc_html_e( 'variation', 'product-admin-tool' ); ?></td>
 							<td><?php echo esc_html( isset( $child['sku'] ) ? (string) $child['sku'] : '' ); ?></td>
 							<td><?php echo esc_html( isset( $child['price'] ) ? (string) $child['price'] : '' ); ?></td>
 							<td><?php echo esc_html( $child_stock ); ?></td>
 							<td><?php echo esc_html( isset( $child['status'] ) ? (string) $child['status'] : '' ); ?></td>
+							<td>&mdash;</td>
 							<td><?php echo esc_html( $child_summary ); ?></td>
 							<td class="pat-row-state">
 								<span class="pat-row-state-message" data-pat-row-state-message></span>

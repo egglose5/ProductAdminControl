@@ -7,6 +7,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 $filters      = isset( $filters ) && $filters instanceof PAT_Product_Filters ? $filters : new PAT_Product_Filters();
 $search_term  = $filters->get_search_term();
 $status_value = $filters->get_status_filter();
+$category_value = $filters->get_category_filter();
 $per_page     = $filters->get_per_page();
 $pagination   = isset( $pagination ) && is_array( $pagination ) ? $pagination : array();
 $state        = $filters->normalize_pagination( $pagination );
@@ -38,6 +39,15 @@ $next_url     = $has_next ? $filters->get_page_url( $page + 1, $current_page_slu
 		<select id="pat-status-filter" name="status">
 			<?php foreach ( $filters->get_status_options() as $value => $label ) : ?>
 				<option value="<?php echo esc_attr( $value ); ?>" <?php selected( $status_value, $value ); ?>>
+					<?php echo esc_html( $label ); ?>
+				</option>
+			<?php endforeach; ?>
+		</select>
+
+		<label class="screen-reader-text" for="pat-category-filter"><?php esc_html_e( 'Filter by category', 'product-admin-tool' ); ?></label>
+		<select id="pat-category-filter" name="category">
+			<?php foreach ( $filters->get_category_options() as $value => $label ) : ?>
+				<option value="<?php echo esc_attr( $value ); ?>" <?php selected( $category_value, $value ); ?>>
 					<?php echo esc_html( $label ); ?>
 				</option>
 			<?php endforeach; ?>

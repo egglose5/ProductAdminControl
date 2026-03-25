@@ -1167,9 +1167,9 @@
 				}
 
 				if (textInput) {
-					var isNumeric = ('regular_price' === fieldName || 'sale_price' === fieldName || 'stock_quantity' === fieldName || 'menu_order' === fieldName);
+					var isNumeric = ('regular_price' === fieldName || 'sale_price' === fieldName || 'stock_quantity' === fieldName || 'menu_order' === fieldName || 'weight' === fieldName || 'length' === fieldName || 'width' === fieldName || 'height' === fieldName);
 					textInput.type = isNumeric ? 'number' : 'text';
-					textInput.step = ('regular_price' === fieldName || 'sale_price' === fieldName) ? '0.01' : '1';
+					textInput.step = ('regular_price' === fieldName || 'sale_price' === fieldName || 'weight' === fieldName || 'length' === fieldName || 'width' === fieldName || 'height' === fieldName) ? '0.01' : '1';
 					textInput.value = '';
 					textInput.style.display = '';
 					textInput.focus();

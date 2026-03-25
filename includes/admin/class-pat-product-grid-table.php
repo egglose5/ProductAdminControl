@@ -36,11 +36,13 @@ class PAT_Product_Grid_Table {
 		return array(
 			'select'   => __( 'Select', 'product-admin-tool' ),
 			'product'  => __( 'Product', 'product-admin-tool' ),
+			'category' => __( 'Category', 'product-admin-tool' ),
 			'type'     => __( 'Type', 'product-admin-tool' ),
 			'sku'      => __( 'SKU', 'product-admin-tool' ),
 			'price'    => __( 'Price', 'product-admin-tool' ),
 			'stock'    => __( 'Stock', 'product-admin-tool' ),
 			'status'   => __( 'Status', 'product-admin-tool' ),
+			'shipping' => __( 'Shipping', 'product-admin-tool' ),
 			'details'  => __( 'Details', 'product-admin-tool' ),
 			'state'    => __( 'State', 'product-admin-tool' ),
 		);

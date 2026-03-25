@@ -119,8 +119,12 @@ class PAT_Variation_Row_Renderer {
 				'title'             => isset( $variation_row['title'] ) ? (string) $variation_row['title'] : '',
 				'sku'               => isset( $variation_row['sku'] ) ? (string) $variation_row['sku'] : '',
 				'price'             => isset( $variation_row['price'] ) ? (string) $variation_row['price'] : '',
+				'regular_price'     => isset( $variation_row['regular_price'] ) ? (string) $variation_row['regular_price'] : ( isset( $variation_row['price'] ) ? (string) $variation_row['price'] : '' ),
+				'sale_price'        => isset( $variation_row['sale_price'] ) ? (string) $variation_row['sale_price'] : '',
 				'stock'             => isset( $variation_row['stock'] ) ? (string) $variation_row['stock'] : '',
+				'stock_quantity'    => isset( $variation_row['stock_quantity'] ) ? (string) $variation_row['stock_quantity'] : ( isset( $variation_row['stock'] ) ? (string) $variation_row['stock'] : '' ),
 				'status'            => isset( $variation_row['status'] ) ? (string) $variation_row['status'] : '',
+				'menu_order'        => isset( $variation_row['menu_order'] ) ? (int) $variation_row['menu_order'] : 0,
 				'attribute_summary' => isset( $variation_row['attribute_summary'] ) ? (string) $variation_row['attribute_summary'] : '',
 			);
 		}

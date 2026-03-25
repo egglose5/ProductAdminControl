@@ -35,6 +35,7 @@ class PAT_Product_Grid_Service {
 	 * - per_page
 	 * - search
 	 * - status
+	 * - category
 	 * - include_variations
 	 *
 	 * @param array $args Query arguments.
@@ -91,6 +92,7 @@ class PAT_Product_Grid_Service {
 			'per_page'           => $per_page,
 			'search'             => isset( $args['search'] ) ? sanitize_text_field( wp_unslash( $args['search'] ) ) : '',
 			'status'             => $this->normalize_status_filter( $args['status'] ?? '' ),
+			'category'           => isset( $args['category'] ) ? sanitize_title( wp_unslash( (string) $args['category'] ) ) : '',
 			'include_variations'  => $this->normalize_boolean( $args['include_variations'] ?? true ),
 		);
 	}
@@ -129,6 +131,7 @@ class PAT_Product_Grid_Service {
 		return array(
 			'search'            => isset( $args['search'] ) ? (string) $args['search'] : '',
 			'status'            => isset( $args['status'] ) ? $args['status'] : '',
+			'category'          => isset( $args['category'] ) ? (string) $args['category'] : '',
 			'per_page'          => isset( $args['per_page'] ) ? absint( $args['per_page'] ) : self::DEFAULT_PER_PAGE,
 			'include_variations' => ! empty( $args['include_variations'] ),
 		);

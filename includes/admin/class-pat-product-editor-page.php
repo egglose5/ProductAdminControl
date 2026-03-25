@@ -71,6 +71,7 @@ class PAT_Product_Editor_Page {
 				'per_page'           => $this->filters ? $this->filters->get_per_page() : 20,
 				'search'             => $this->filters ? $this->filters->get_search_term() : '',
 				'status'             => $this->filters ? $this->filters->get_status_filter() : '',
+				'category'           => $this->filters ? $this->filters->get_category_filter() : '',
 				'include_variations' => true,
 			)
 		);

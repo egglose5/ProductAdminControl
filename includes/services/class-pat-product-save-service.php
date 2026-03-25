@@ -17,6 +17,11 @@ class PAT_Product_Save_Service {
 		'regular_price',
 		'sale_price',
 		'stock_quantity',
+		'weight',
+		'length',
+		'width',
+		'height',
+		'shipping_class_id',
 		'menu_order',
 	);
 
@@ -200,6 +205,36 @@ class PAT_Product_Save_Service {
 					}
 					break;
 
+				case 'weight':
+					if ( method_exists( $product, 'set_weight' ) ) {
+						$product->set_weight( '' === $value ? '' : (string) $value );
+					}
+					break;
+
+				case 'length':
+					if ( method_exists( $product, 'set_length' ) ) {
+						$product->set_length( '' === $value ? '' : (string) $value );
+					}
+					break;
+
+				case 'width':
+					if ( method_exists( $product, 'set_width' ) ) {
+						$product->set_width( '' === $value ? '' : (string) $value );
+					}
+					break;
+
+				case 'height':
+					if ( method_exists( $product, 'set_height' ) ) {
+						$product->set_height( '' === $value ? '' : (string) $value );
+					}
+					break;
+
+				case 'shipping_class_id':
+					if ( method_exists( $product, 'set_shipping_class_id' ) ) {
+						$product->set_shipping_class_id( '' === $value ? 0 : absint( $value ) );
+					}
+					break;
+
 				case 'menu_order':
 					if ( method_exists( $product, 'set_menu_order' ) ) {
 						$product->set_menu_order( (int) $value );
@@ -209,12 +244,6 @@ class PAT_Product_Save_Service {
 				default:
 					$errors[ $field ] = __( 'Unsupported field.', 'product-admin-tool' );
 					break;
-			}
-		}
-
-		if ( isset( $changes['sale_price'] ) && '' !== $changes['sale_price'] && isset( $changes['regular_price'] ) && '' !== $changes['regular_price'] ) {
-			if ( (float) $changes['sale_price'] > (float) $changes['regular_price'] ) {
-				$errors['sale_price'] = __( 'Sale price cannot exceed regular price.', 'product-admin-tool' );
 			}
 		}
 
@@ -302,6 +331,31 @@ class PAT_Product_Save_Service {
 					$value = $integer;
 					break;
 
+				case 'weight':
+				case 'length':
+				case 'width':
+				case 'height':
+					$decimal = $this->sanitize_decimal( $value );
+
+					if ( null === $decimal ) {
+						$errors[ $field ] = __( 'Shipping dimensions and weight must be numeric.', 'product-admin-tool' );
+						continue 2;
+					}
+
+					$value = $decimal;
+					break;
+
+				case 'shipping_class_id':
+					$integer = $this->sanitize_integer_or_empty( $value );
+
+					if ( null === $integer ) {
+						$errors['shipping_class_id'] = __( 'Shipping class must be a valid ID.', 'product-admin-tool' );
+						continue 2;
+					}
+
+					$value = $integer;
+					break;
+
 				case 'menu_order':
 					$value = intval( $value );
 					break;
@@ -324,7 +378,7 @@ class PAT_Product_Save_Service {
 	 * @return array<string, mixed>
 	 */
 	private function validate_sale_price_relationship( $product, array $changes ): array {
-		if ( ! array_key_exists( 'sale_price', $changes ) ) {
+		if ( ! array_key_exists( 'sale_price', $changes ) && ! array_key_exists( 'regular_price', $changes ) ) {
 			return array(
 				'valid'   => true,
 				'errors'  => array(),
@@ -332,9 +386,15 @@ class PAT_Product_Save_Service {
 			);
 		}
 
-		$sale_price = $changes['sale_price'];
+		$regular_price = array_key_exists( 'regular_price', $changes )
+			? $changes['regular_price']
+			: ( method_exists( $product, 'get_regular_price' ) ? $product->get_regular_price() : null );
 
-		if ( '' === $sale_price || null === $sale_price ) {
+		$sale_price = array_key_exists( 'sale_price', $changes )
+			? $changes['sale_price']
+			: ( method_exists( $product, 'get_sale_price' ) ? $product->get_sale_price() : null );
+
+		if ( '' === $sale_price || null === $sale_price || '' === $regular_price || null === $regular_price ) {
 			return array(
 				'valid'   => true,
 				'errors'  => array(),
@@ -342,21 +402,6 @@ class PAT_Product_Save_Service {
 			);
 		}
 
-		$regular_price = null;
-
-		if ( array_key_exists( 'regular_price', $changes ) ) {
-			$regular_price = $changes['regular_price'];
-		} elseif ( method_exists( $product, 'get_regular_price' ) ) {
-			$regular_price = $product->get_regular_price();
-		}
-
-		if ( '' === $regular_price || null === $regular_price ) {
-			return array(
-				'valid'   => true,
-				'errors'  => array(),
-				'message' => '',
-			);
-		}
 
 		if ( (float) $sale_price > (float) $regular_price ) {
 			return array(
@@ -461,6 +506,11 @@ class PAT_Product_Save_Service {
 			'regular_price'  => method_exists( $product, 'get_regular_price' ) ? (string) $product->get_regular_price() : '',
 			'sale_price'     => method_exists( $product, 'get_sale_price' ) ? (string) $product->get_sale_price() : '',
 			'stock_quantity' => method_exists( $product, 'get_stock_quantity' ) ? $product->get_stock_quantity() : null,
+			'weight'         => method_exists( $product, 'get_weight' ) ? (string) $product->get_weight() : '',
+			'length'         => method_exists( $product, 'get_length' ) ? (string) $product->get_length() : '',
+			'width'          => method_exists( $product, 'get_width' ) ? (string) $product->get_width() : '',
+			'height'         => method_exists( $product, 'get_height' ) ? (string) $product->get_height() : '',
+			'shipping_class_id' => method_exists( $product, 'get_shipping_class_id' ) ? (int) $product->get_shipping_class_id() : 0,
 			'menu_order'     => method_exists( $product, 'get_menu_order' ) ? (int) $product->get_menu_order() : 0,
 		);
 	}
