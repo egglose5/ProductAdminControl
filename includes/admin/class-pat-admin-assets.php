@@ -44,6 +44,9 @@ class PAT_Admin_Assets {
 				'variationAction'     => class_exists( 'PAT_Variation_Controller' ) ? PAT_Variation_Controller::AJAX_ACTION : '',
 				'variationNonce'      => class_exists( 'PAT_Variation_Controller' ) ? wp_create_nonce( PAT_Variation_Controller::NONCE_ACTION ) : '',
 				'variationNonceField' => class_exists( 'PAT_Variation_Controller' ) ? PAT_Variation_Controller::NONCE_FIELD : 'nonce',
+				'variationPreviewAction' => class_exists( 'PAT_Variation_Generator_Controller' ) ? PAT_Variation_Generator_Controller::AJAX_ACTION : '',
+				'variationPreviewNonce' => class_exists( 'PAT_Variation_Generator_Controller' ) ? wp_create_nonce( PAT_Variation_Generator_Controller::NONCE_ACTION ) : '',
+				'variationPreviewNonceField' => class_exists( 'PAT_Variation_Generator_Controller' ) ? PAT_Variation_Generator_Controller::NONCE_FIELD : 'nonce',
 			)
 		);
 	}

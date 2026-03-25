@@ -352,6 +352,7 @@
 		}
 
 		updateBulkEditBar(root);
+		updateGenerateButton(root);
 	}
 
 	function syncSelectionUI(root) {
@@ -1191,7 +1192,9 @@
 		bindEditableEvents(root);
 		bindSelectionEvents(root);
 		bindBulkEditEvents(root);
+		bindVariationGeneration(root);
 		bindSaveToolbar(root);
+		updateGenerateButton(root);
 		updateToolbar(root, 'idle', 'No pending changes.');
 	}
 
@@ -1249,6 +1252,145 @@
 					rows: [],
 					html: ''
 				};
+			});
+		});
+	}
+
+	function requestVariationPreview(parentId) {
+		if (!window.PATAdmin || !window.PATAdmin.ajaxUrl || !window.PATAdmin.variationPreviewAction) {
+			return Promise.resolve({
+				success: false,
+				message: 'Variation preview endpoint is not configured.',
+				rows: [],
+				html: ''
+			});
+		}
+
+		var formData = new window.FormData();
+		formData.append('action', window.PATAdmin.variationPreviewAction);
+		formData.append(window.PATAdmin.variationPreviewNonceField || 'nonce', window.PATAdmin.variationPreviewNonce || '');
+		formData.append('parent_id', String(parentId));
+
+		return window.fetch(window.PATAdmin.ajaxUrl, {
+			method: 'POST',
+			credentials: 'same-origin',
+			body: formData
+		}).then(function (response) {
+			return response.json().catch(function () {
+				return {
+					success: false,
+					message: 'Variation preview response could not be parsed.',
+					rows: [],
+					html: ''
+				};
+			});
+		});
+	}
+
+	function getSelectedPreviewParents(root) {
+		var selectedRows = root.querySelectorAll(ROW_SELECTOR + '.is-selected[data-pat-row-type="product"]');
+		var parents = [];
+
+		Array.prototype.forEach.call(selectedRows, function (row) {
+			if ('true' !== row.getAttribute('data-pat-children-lazy')) {
+				return;
+			}
+
+			parents.push(row);
+		});
+
+		return parents;
+	}
+
+	function updateGenerateButton(root) {
+		var trigger = root.querySelector('[data-pat-generate-variations-trigger]');
+
+		if (!trigger) {
+			return;
+		}
+
+		trigger.disabled = 0 === getSelectedPreviewParents(root).length;
+	}
+
+	function applyVariationPreview(root, parentRow, payload) {
+		if (!parentRow) {
+			return;
+		}
+
+		var parentId = getParentIdFromRow(parentRow);
+		var parentDomId = getParentDomId(parentRow);
+		var rows = payload && Array.isArray(payload.rows) ? payload.rows : [];
+		var html = payload && payload.html ? payload.html : '';
+		var message = payload && payload.message ? payload.message : '';
+		var button = root.querySelector('[data-pat-toggle-children][data-pat-target="' + parentDomId + '"]');
+		var childRows = [];
+
+		cacheVariationRows(parentId, rows, html);
+
+		if (html) {
+			childRows = insertVariationMarkup(parentRow, html);
+			snapshotEditableFields(root);
+			refreshSelectionAfterDomChange(root);
+		} else {
+			childRows = getChildRowsByParentDomId(parentDomId);
+		}
+
+		if (button) {
+			updateToggleButton(button, true);
+		}
+
+		parentRow.classList.add('is-open');
+		setHidden(root, childRows, false);
+		syncVariationRowState(parentId, {
+			status: 'loaded',
+			message: message
+		});
+	}
+
+	function bindVariationGeneration(root) {
+		var trigger = root.querySelector('[data-pat-generate-variations-trigger]');
+
+		if (!trigger) {
+			return;
+		}
+
+		trigger.addEventListener('click', function (event) {
+			event.preventDefault();
+
+			var parents = getSelectedPreviewParents(root);
+
+			if (!parents.length) {
+				updateToolbar(root, 'idle', 'Select at least one variable parent row to generate previews.');
+				return;
+			}
+
+			updateToolbar(root, 'saving', 'Generating variation previews...');
+
+			Promise.all(parents.map(function (parentRow) {
+				var parentId = getParentIdFromRow(parentRow);
+				markVariationLoading(parentId, 'Generating variation previews...');
+
+				return requestVariationPreview(parentId).then(function (response) {
+					var payload = response && response.data && !Array.isArray(response.rows) ? response.data : response;
+
+					if (!payload || !payload.success) {
+						throw new Error(payload && payload.message ? payload.message : 'Variation preview generation failed.');
+					}
+
+					applyVariationPreview(root, parentRow, payload);
+					return payload;
+				});
+			})).then(function (payloads) {
+				var generatedCount = 0;
+
+				payloads.forEach(function (payload) {
+					var generatedRows = payload && Array.isArray(payload.generated_rows) ? payload.generated_rows : [];
+					generatedCount += generatedRows.length;
+				});
+
+				updateToolbar(root, 'saved', 'Generated preview rows: ' + generatedCount + '.');
+			}).catch(function (error) {
+				updateToolbar(root, 'error', error && error.message ? error.message : 'Variation preview generation failed.');
 			});
 		});
 	}

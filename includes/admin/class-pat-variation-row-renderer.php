@@ -113,9 +113,15 @@ class PAT_Variation_Row_Renderer {
 			}
 
 			$row_id = isset( $variation_row['id'] ) ? (int) $variation_row['id'] : 0;
+			$temp_id = isset( $variation_row['temp_id'] ) ? (string) $variation_row['temp_id'] : '';
+
+			if ( $row_id <= 0 && '' !== $temp_id ) {
+				$row_id = $temp_id;
+			}
 
 			$rows[] = array(
 				'id'                => $row_id,
+				'temp_id'           => $temp_id,
 				'title'             => isset( $variation_row['title'] ) ? (string) $variation_row['title'] : '',
 				'sku'               => isset( $variation_row['sku'] ) ? (string) $variation_row['sku'] : '',
 				'price'             => isset( $variation_row['price'] ) ? (string) $variation_row['price'] : '',
@@ -125,6 +131,8 @@ class PAT_Variation_Row_Renderer {
 				'stock_quantity'    => isset( $variation_row['stock_quantity'] ) ? (string) $variation_row['stock_quantity'] : ( isset( $variation_row['stock'] ) ? (string) $variation_row['stock'] : '' ),
 				'status'            => isset( $variation_row['status'] ) ? (string) $variation_row['status'] : '',
 				'menu_order'        => isset( $variation_row['menu_order'] ) ? (int) $variation_row['menu_order'] : 0,
+				'is_generated'      => ! empty( $variation_row['is_generated'] ),
+				'is_preview'        => ! empty( $variation_row['is_preview'] ),
 				'attribute_summary' => isset( $variation_row['attribute_summary'] ) ? (string) $variation_row['attribute_summary'] : '',
 			);
 		}

@@ -23,6 +23,7 @@ class PAT_Loader {
 			PAT_PLUGIN_PATH . 'includes/admin/class-pat-admin-menu.php',
 			PAT_PLUGIN_PATH . 'includes/controllers/class-pat-save-controller.php',
 			PAT_PLUGIN_PATH . 'includes/controllers/class-pat-variation-controller.php',
+			PAT_PLUGIN_PATH . 'includes/controllers/class-pat-variation-generator-controller.php',
 			PAT_PLUGIN_PATH . 'includes/repositories/class-pat-product-repository.php',
 			PAT_PLUGIN_PATH . 'includes/repositories/class-pat-variation-repository.php',
 			PAT_PLUGIN_PATH . 'includes/services/class-pat-product-grid-service.php',

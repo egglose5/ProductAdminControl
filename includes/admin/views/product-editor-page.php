@@ -32,7 +32,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	<div class="pat-toolbar pat-action-bar">
 		<button type="button" class="button" data-pat-bulk-edit-trigger="true" disabled="disabled"><?php esc_html_e( 'Bulk Edit', 'product-admin-tool' ); ?></button>
 		<button type="button" class="button" disabled="disabled"><?php esc_html_e( 'Fill Down', 'product-admin-tool' ); ?></button>
-		<button type="button" class="button" disabled="disabled"><?php esc_html_e( 'Generate Variations', 'product-admin-tool' ); ?></button>
+		<button type="button" class="button" data-pat-generate-variations-trigger="true" disabled="disabled"><?php esc_html_e( 'Generate Variations', 'product-admin-tool' ); ?></button>
 		<span class="description"><?php esc_html_e( 'Select rows to use Bulk Edit. Fill Down and Generate Variations are scheduled for later phases.', 'product-admin-tool' ); ?></span>
 	</div>
 
