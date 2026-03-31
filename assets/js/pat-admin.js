@@ -1105,6 +1105,12 @@
 			trigger.disabled = (0 === count);
 		}
 
+		var fillDownTrigger = root.querySelector('[data-pat-fill-down-trigger]');
+
+		if (fillDownTrigger) {
+			fillDownTrigger.disabled = (count < 2);
+		}
+
 		var bar = root.querySelector('[data-pat-bulk-edit-bar]');
 
 		if (!bar) {
@@ -1118,13 +1124,15 @@
 		}
 	}
 
-	function openBulkEditBar(root) {
+	function openBulkEditBar(root, operation) {
 		var bar = root.querySelector('[data-pat-bulk-edit-bar]');
 
 		if (!bar) {
 			return;
 		}
 
+		operation = operation || 'bulk-edit';
+		bar.setAttribute('data-pat-operation', operation);
 		bar.hidden = false;
 		updateBulkEditBar(root);
 	}
@@ -1137,6 +1145,7 @@
 		}
 
 		bar.hidden = true;
+		bar.setAttribute('data-pat-operation', 'bulk-edit');
 
 		var fieldSelect = bar.querySelector('[data-pat-bulk-field-select]');
 		var statusSelect = bar.querySelector('[data-pat-bulk-value-status]');
@@ -1207,13 +1216,69 @@
 		closeBulkEditBar(root);
 	}
 
+	function applyFillDown(root) {
+		var selectedRows = root.querySelectorAll(ROW_SELECTOR + '.is-selected');
+		var visibleRows = Array.prototype.filter.call(selectedRows, function (row) {
+			return !row.hidden && !row.classList.contains('is-hidden');
+		});
+
+		if (visibleRows.length < 2) {
+			return;
+		}
+
+		var fieldSelect = root.querySelector('[data-pat-bulk-edit-bar] [data-pat-bulk-field-select]');
+
+		if (!fieldSelect || !fieldSelect.value) {
+			return;
+		}
+
+		var fieldName = fieldSelect.value;
+		var sourceRow = visibleRows[0];
+		var sourceField = sourceRow.querySelector(FIELD_SELECTOR + '[data-pat-field="' + fieldName + '"]');
+
+		if (!sourceField) {
+			return;
+		}
+
+		var sourceValue = 'value' in sourceField ? sourceField.value : sourceField.textContent;
+
+		visibleRows.slice(1).forEach(function (row) {
+			var field = row.querySelector(FIELD_SELECTOR + '[data-pat-field="' + fieldName + '"]');
+
+			if (!field) {
+				return;
+			}
+
+			if ('value' in field) {
+				field.value = sourceValue;
+			} else if (field.isContentEditable) {
+				field.textContent = sourceValue;
+			}
+
+			ensureOriginalValue(field);
+			updateFieldState(field);
+		});
+
+		updateToolbar(root, getEditorState(root));
+		closeBulkEditBar(root);
+	}
+
 	function bindBulkEditEvents(root) {
 		var trigger = root.querySelector('[data-pat-bulk-edit-trigger]');
 
 		if (trigger) {
 			trigger.addEventListener('click', function (event) {
 				event.preventDefault();
-				openBulkEditBar(root);
+				openBulkEditBar(root, 'bulk-edit');
+			});
+		}
+
+		var fillDownTrigger = root.querySelector('[data-pat-fill-down-trigger]');
+
+		if (fillDownTrigger) {
+			fillDownTrigger.addEventListener('click', function (event) {
+				event.preventDefault();
+				openBulkEditBar(root, 'fill-down');
 			});
 		}
 
@@ -1223,7 +1288,13 @@
 			}
 
 			if (event.target.closest('[data-pat-bulk-apply]') && root.contains(event.target)) {
-				applyBulkEdit(root);
+				var bar = root.querySelector('[data-pat-bulk-edit-bar]');
+				var operation = bar ? bar.getAttribute('data-pat-operation') : 'bulk-edit';
+				if ('fill-down' === operation) {
+					applyFillDown(root);
+				} else {
+					applyBulkEdit(root);
+				}
 			}
 		});
 

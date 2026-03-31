@@ -31,9 +31,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 	<div class="pat-toolbar pat-action-bar">
 		<button type="button" class="button" data-pat-bulk-edit-trigger="true" disabled="disabled"><?php esc_html_e( 'Bulk Edit', 'product-admin-tool' ); ?></button>
-		<button type="button" class="button" disabled="disabled"><?php esc_html_e( 'Fill Down', 'product-admin-tool' ); ?></button>
+		<button type="button" class="button" data-pat-fill-down-trigger="true" disabled="disabled"><?php esc_html_e( 'Fill Down', 'product-admin-tool' ); ?></button>
 		<button type="button" class="button" data-pat-generate-variations-trigger="true" disabled="disabled"><?php esc_html_e( 'Generate Variations', 'product-admin-tool' ); ?></button>
-		<span class="description"><?php esc_html_e( 'Select rows to use Bulk Edit. Fill Down and Generate Variations are scheduled for later phases.', 'product-admin-tool' ); ?></span>
+		<span class="description"><?php esc_html_e( 'Select rows to use Bulk Edit or Fill Down. Generate Variations is ready to use.', 'product-admin-tool' ); ?></span>
 	</div>
 
 	<div class="pat-toolbar pat-bulk-edit-bar" data-pat-bulk-edit-bar="true" hidden aria-label="<?php esc_attr_e( 'Bulk edit selected rows', 'product-admin-tool' ); ?>">
