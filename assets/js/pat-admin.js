@@ -8,7 +8,7 @@
 		selectedKeys: Object.create(null),
 		anchorKey: '',
 		focusKey: '',
-		variationsOnly: false,
+		hideParentRows: false,
 		bulkEditExcludeParents: false
 	};
 
@@ -294,15 +294,7 @@
 		var rows = root.querySelectorAll(ROW_SELECTOR);
 
 		return Array.prototype.filter.call(rows, function (row) {
-			if (!isRowVisible(row)) {
-				return false;
-			}
-
-			if (selectionState.variationsOnly && isParentRow(row)) {
-				return false;
-			}
-
-			return true;
+			return isRowVisible(row);
 		});
 	}
 
@@ -378,25 +370,44 @@
 		updateSelectedCount(root);
 	}
 
-	function toggleVariationsOnly(root) {
-		selectionState.variationsOnly = !selectionState.variationsOnly;
-
-		var button = root.querySelector('[data-pat-variations-only-toggle]');
-
-		if (button) {
-			button.classList.toggle('is-active', selectionState.variationsOnly);
-		}
-
+	function syncHideParentsControls(root) {
 		var filterCheckbox = root.querySelector('[data-pat-variations-only-filter]');
+		var hideButton = root.querySelector('[data-pat-hide-parents-trigger]');
 
 		if (filterCheckbox) {
-			filterCheckbox.checked = selectionState.variationsOnly;
+			filterCheckbox.checked = !!selectionState.hideParentRows;
 		}
 
-		if (selectionState.variationsOnly) {
+		if (hideButton) {
+			hideButton.classList.toggle('is-active', !!selectionState.hideParentRows);
+		}
+	}
+
+	function setHideParents(root, shouldHide) {
+		selectionState.hideParentRows = !!shouldHide;
+
+		var parentRows = root.querySelectorAll(ROW_SELECTOR + '[data-pat-row-type="product"]');
+
+		if (selectionState.hideParentRows) {
 			deselectParents(root);
 		}
 
+		Array.prototype.forEach.call(parentRows, function (row) {
+			if (selectionState.hideParentRows) {
+				row.hidden = true;
+				row.classList.add('is-hidden');
+				row.setAttribute('data-pat-hidden-by-user', 'true');
+				return;
+			}
+
+			if ('true' === row.getAttribute('data-pat-hidden-by-user')) {
+				row.hidden = false;
+				row.classList.remove('is-hidden');
+				row.removeAttribute('data-pat-hidden-by-user');
+			}
+		});
+
+		syncHideParentsControls(root);
 		syncSelectionUI(root);
 	}
 
@@ -1451,17 +1462,25 @@
 			var filterCheckbox = event.target.closest('[data-pat-variations-only-filter]');
 
 			if (filterCheckbox && root.contains(filterCheckbox)) {
-				toggleVariationsOnly(root);
+				setHideParents(root, !!filterCheckbox.checked);
 				return;
 			}
 		});
 
 		root.addEventListener('click', function (event) {
-			var toggleButton = event.target.closest('[data-pat-variations-only-toggle]');
+			var deselectButton = event.target.closest('[data-pat-deselect-parents-trigger]');
 
-			if (toggleButton && root.contains(toggleButton)) {
+			if (deselectButton && root.contains(deselectButton)) {
 				event.preventDefault();
-				toggleVariationsOnly(root);
+				deselectParents(root);
+				return;
+			}
+
+			var hideParentsButton = event.target.closest('[data-pat-hide-parents-trigger]');
+
+			if (hideParentsButton && root.contains(hideParentsButton)) {
+				event.preventDefault();
+				setHideParents(root, !selectionState.hideParentRows);
 				return;
 			}
 		});
@@ -1469,6 +1488,15 @@
 
 	function setUpEditableShell(root) {
 		snapshotEditableFields(root);
+
+		var filterCheckbox = root.querySelector('[data-pat-variations-only-filter]');
+
+		if (filterCheckbox) {
+			setHideParents(root, !!filterCheckbox.checked);
+		} else {
+			syncHideParentsControls(root);
+		}
+
 		bindEditableEvents(root);
 		bindSelectionEvents(root);
 		bindBulkEditEvents(root);

@@ -33,7 +33,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 		<button type="button" class="button" data-pat-bulk-edit-trigger="true" disabled="disabled"><?php esc_html_e( 'Bulk Edit', 'product-admin-tool' ); ?></button>
 		<button type="button" class="button" data-pat-fill-down-trigger="true" disabled="disabled"><?php esc_html_e( 'Fill Down', 'product-admin-tool' ); ?></button>
 		<button type="button" class="button" data-pat-generate-variations-trigger="true" disabled="disabled"><?php esc_html_e( 'Generate Variations', 'product-admin-tool' ); ?></button>
-		<button type="button" class="button" data-pat-variations-only-toggle="true" title="<?php esc_attr_e( 'Toggle to show/work with variations only', 'product-admin-tool' ); ?>"><?php esc_html_e( 'Variations only', 'product-admin-tool' ); ?></button>
+		<button type="button" class="button" data-pat-deselect-parents-trigger="true" title="<?php esc_attr_e( 'Deselect parent product rows', 'product-admin-tool' ); ?>"><?php esc_html_e( 'Deselect parent products', 'product-admin-tool' ); ?></button>
+		<button type="button" class="button" data-pat-hide-parents-trigger="true" title="<?php esc_attr_e( 'Hide parent product rows', 'product-admin-tool' ); ?>"><?php esc_html_e( 'Hide parent products', 'product-admin-tool' ); ?></button>
 		<span class="description"><?php esc_html_e( 'Select rows to use Bulk Edit or Fill Down. Generate Variations is ready to use.', 'product-admin-tool' ); ?></span>
 	</div>
 

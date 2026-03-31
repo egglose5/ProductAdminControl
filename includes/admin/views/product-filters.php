@@ -14,6 +14,7 @@ $category_descendants = isset( $category_scope['descendant_count'] ) ? max( 0, a
 $category_selected_name = isset( $category_scope['selected_name'] ) ? (string) $category_scope['selected_name'] : '';
 $category_parent_count = isset( $category_scope['parent_product_count'] ) ? max( 0, absint( $category_scope['parent_product_count'] ) ) : 0;
 $category_variation_count = isset( $category_scope['variation_row_count'] ) ? max( 0, absint( $category_scope['variation_row_count'] ) ) : 0;
+$variations_only = $filters->get_variations_only();
 $per_page     = $filters->get_per_page();
 $pagination   = isset( $pagination ) && is_array( $pagination ) ? $pagination : array();
 $state        = $filters->normalize_pagination( $pagination );
@@ -76,8 +77,9 @@ $next_url     = $has_next ? $filters->get_page_url( $page + 1, $current_page_slu
 				name="variations_only"
 				data-pat-variations-only-filter="true"
 				style="margin-right: 6px;"
+				<?php checked( $variations_only ); ?>
 			/>
-			<?php esc_html_e( 'Show variations only', 'product-admin-tool' ); ?>
+			<?php esc_html_e( 'Hide parent products', 'product-admin-tool' ); ?>
 		</label>
 	</div>
 	<?php if ( '' !== $category_value ) : ?>

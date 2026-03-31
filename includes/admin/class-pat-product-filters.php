@@ -53,6 +53,15 @@ class PAT_Product_Filters {
 	}
 
 	/**
+	 * Check if parent rows should be hidden in the editor view.
+	 *
+	 * @return bool
+	 */
+	public function get_variations_only(): bool {
+		return $this->get_request_bool( 'variations_only' );
+	}
+
+	/**
 	 * Get the current page size.
 	 *
 	 * @return int
@@ -184,6 +193,7 @@ class PAT_Product_Filters {
 			's'        => $this->get_search_term(),
 			'status'   => $this->get_status_filter(),
 			'category' => $this->get_category_filter(),
+			'variations_only' => $this->get_variations_only() ? '1' : '',
 			'per_page' => $this->get_per_page(),
 		);
 
@@ -256,5 +266,21 @@ class PAT_Product_Filters {
 		}
 
 		return sanitize_text_field( wp_unslash( $_GET[ $key ] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+	}
+
+	/**
+	 * Get a sanitized boolean request value.
+	 *
+	 * @param string $key Request key.
+	 * @return bool
+	 */
+	private function get_request_bool( string $key ): bool {
+		if ( ! isset( $_GET[ $key ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			return false;
+		}
+
+		$value = strtolower( sanitize_text_field( wp_unslash( $_GET[ $key ] ) ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+
+		return in_array( $value, array( '1', 'true', 'yes', 'on' ), true );
 	}
 }
