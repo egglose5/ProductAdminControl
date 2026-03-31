@@ -32,10 +32,23 @@ if ( ! defined( 'ABSPATH' ) ) {
 	<div class="pat-toolbar pat-action-bar">
 		<button type="button" class="button" data-pat-bulk-edit-trigger="true" disabled="disabled"><?php esc_html_e( 'Bulk Edit', 'product-admin-tool' ); ?></button>
 		<button type="button" class="button" data-pat-fill-down-trigger="true" disabled="disabled"><?php esc_html_e( 'Fill Down', 'product-admin-tool' ); ?></button>
+		<button type="button" class="button" data-pat-open-editor-trigger="true" disabled="disabled" title="<?php esc_attr_e( 'Load variation rows for selected parent products', 'product-admin-tool' ); ?>"><?php esc_html_e( 'Open in Editor', 'product-admin-tool' ); ?></button>
 		<button type="button" class="button" data-pat-generate-variations-trigger="true" disabled="disabled"><?php esc_html_e( 'Generate Variations', 'product-admin-tool' ); ?></button>
+		<button type="button" class="button" data-pat-undo-trigger="true"><?php esc_html_e( 'Undo Last Save', 'product-admin-tool' ); ?></button>
+		<button type="button" class="button" data-pat-history-trigger="true" title="<?php esc_attr_e( 'View recent save history', 'product-admin-tool' ); ?>"><?php esc_html_e( 'Save History', 'product-admin-tool' ); ?></button>
 		<button type="button" class="button" data-pat-deselect-parents-trigger="true" title="<?php esc_attr_e( 'Deselect parent product rows', 'product-admin-tool' ); ?>"><?php esc_html_e( 'Deselect parent products', 'product-admin-tool' ); ?></button>
 		<button type="button" class="button" data-pat-hide-parents-trigger="true" title="<?php esc_attr_e( 'Hide parent product rows', 'product-admin-tool' ); ?>"><?php esc_html_e( 'Hide parent products', 'product-admin-tool' ); ?></button>
 		<span class="description"><?php esc_html_e( 'Select rows to use Bulk Edit or Fill Down. Generate Variations is ready to use.', 'product-admin-tool' ); ?></span>
+	</div>
+
+	<div class="pat-history-panel" data-pat-history-panel="true" hidden aria-label="<?php esc_attr_e( 'Save history', 'product-admin-tool' ); ?>">
+		<div class="pat-history-panel-header">
+			<strong><?php esc_html_e( 'Recent Save History', 'product-admin-tool' ); ?></strong>
+			<button type="button" class="button-link pat-history-panel-close" data-pat-history-close="true" aria-label="<?php esc_attr_e( 'Close history panel', 'product-admin-tool' ); ?>">&#x2715;</button>
+		</div>
+		<div class="pat-history-list" data-pat-history-list="true">
+			<p class="pat-history-loading"><?php esc_html_e( 'Loading history\xe2\x80\xa6', 'product-admin-tool' ); ?></p>
+		</div>
 	</div>
 
 	<div class="pat-toolbar pat-bulk-edit-bar" data-pat-bulk-edit-bar="true" hidden aria-label="<?php esc_attr_e( 'Bulk edit selected rows', 'product-admin-tool' ); ?>">

@@ -991,6 +991,60 @@
 		});
 	}
 
+	function requestUndoLastSave() {
+		if (!window.PATAdmin || !window.PATAdmin.ajaxUrl || !window.PATAdmin.undoAction) {
+			return Promise.resolve({
+				success: false,
+				message: 'Undo endpoint is not configured.',
+				results: []
+			});
+		}
+
+		var formData = new window.FormData();
+		formData.append('action', window.PATAdmin.undoAction);
+		formData.append(window.PATAdmin.undoNonceField || 'nonce', window.PATAdmin.undoNonce || '');
+
+		return window.fetch(window.PATAdmin.ajaxUrl, {
+			method: 'POST',
+			credentials: 'same-origin',
+			body: formData
+		}).then(function (response) {
+			return response.json().catch(function () {
+				return {
+					success: false,
+					message: 'Undo response could not be parsed.',
+					results: []
+				};
+			});
+		});
+	}
+
+	function applyUndoResults(root, response) {
+		var payload = response && response.data && !Array.isArray(response.results) ? response.data : response;
+		var results = payload && Array.isArray(payload.results) ? payload.results : [];
+		var requestRows = results.map(function (result) {
+			return {
+				id: result && result.id ? result.id : 0,
+				client_row_id: result && result.client_row_id ? String(result.client_row_id) : String(result && result.id ? result.id : 0)
+			};
+		});
+
+		applySaveResults(root, response, requestRows);
+	}
+
+	function handleUndoClick(root) {
+		updateToolbar(root, 'saving', 'Undoing latest saved batch...');
+
+		requestUndoLastSave().then(function (response) {
+			applyUndoResults(root, response);
+			var payload = response && response.data && !Array.isArray(response.results) ? response.data : response;
+			updateToolbar(root, payload && payload.success ? 'saved' : 'error', payload && payload.message ? payload.message : 'Undo request completed.');
+			refreshHistoryPanelIfOpen(root);
+		}).catch(function (error) {
+			updateToolbar(root, 'error', error && error.message ? error.message : 'Undo failed.');
+		});
+	}
+
 	function handleSaveClick(root) {
 		var payload = {
 			rows: collectDirtyRows(root)
@@ -1017,6 +1071,7 @@
 				applySaveResults(root, response, payload.rows);
 				var payloadResponse = response && response.data && 'undefined' === typeof response.results ? response.data : response;
 				updateToolbar(root, payloadResponse && payloadResponse.success ? 'saved' : 'error', payloadResponse && payloadResponse.message ? payloadResponse.message : 'Save request completed.');
+				refreshHistoryPanelIfOpen(root);
 			})
 			.catch(function (error) {
 				applySaveResults(root, { success: false, message: error && error.message ? error.message : 'Save failed.', results: [] }, payload.rows);
@@ -1186,6 +1241,16 @@
 
 		if (fillDownTrigger) {
 			fillDownTrigger.disabled = (count < 2);
+		}
+
+		var openEditorTrigger = root.querySelector('[data-pat-open-editor-trigger]');
+
+		if (openEditorTrigger) {
+			var selectedParentCount = Array.prototype.filter.call(selectedRows, function (row) {
+				return isParentRow(row);
+			}).length;
+
+			openEditorTrigger.disabled = (0 === selectedParentCount);
 		}
 
 		var bar = root.querySelector('[data-pat-bulk-edit-bar]');
@@ -1383,6 +1448,24 @@
 			});
 		}
 
+		var openEditorTrigger = root.querySelector('[data-pat-open-editor-trigger]');
+
+		if (openEditorTrigger) {
+			openEditorTrigger.addEventListener('click', function (event) {
+				event.preventDefault();
+				handleOpenEditorClick(root);
+			});
+		}
+
+		var undoTrigger = root.querySelector('[data-pat-undo-trigger]');
+
+		if (undoTrigger) {
+			undoTrigger.addEventListener('click', function (event) {
+				event.preventDefault();
+				handleUndoClick(root);
+			});
+		}
+
 		root.addEventListener('click', function (event) {
 			if (event.target.closest('[data-pat-bulk-cancel]') && root.contains(event.target)) {
 				closeBulkEditBar(root);
@@ -1490,6 +1573,11 @@
 		snapshotEditableFields(root);
 
 		var filterCheckbox = root.querySelector('[data-pat-variations-only-filter]');
+		var undoTrigger = root.querySelector('[data-pat-undo-trigger]');
+
+		if (undoTrigger && (!window.PATAdmin || !window.PATAdmin.undoAction)) {
+			undoTrigger.disabled = true;
+		}
 
 		if (filterCheckbox) {
 			setHideParents(root, !!filterCheckbox.checked);
@@ -1502,6 +1590,7 @@
 		bindBulkEditEvents(root);
 		bindVariationGeneration(root);
 		bindSaveToolbar(root);
+		bindHistoryPanel(root);
 		updateGenerateButton(root);
 		updateToolbar(root, 'idle', 'No pending changes.');
 	}
@@ -1595,19 +1684,110 @@
 		});
 	}
 
-	function getSelectedPreviewParents(root) {
+	function getSelectedParentRows(root) {
 		var selectedRows = root.querySelectorAll(ROW_SELECTOR + '.is-selected[data-pat-row-type="product"]');
-		var parents = [];
 
-		Array.prototype.forEach.call(selectedRows, function (row) {
-			if ('true' !== row.getAttribute('data-pat-children-lazy')) {
-				return;
+		return Array.prototype.filter.call(selectedRows, function (row) {
+			return !row.hidden && !row.classList.contains('is-hidden');
+		});
+	}
+
+	function getSelectedPreviewParents(root) {
+		var parents = getSelectedParentRows(root);
+
+		return parents.filter(function (row) {
+			return 'true' === row.getAttribute('data-pat-children-lazy');
+		});
+	}
+
+	function ensureParentExpanded(root, parentRow) {
+		if (!parentRow) {
+			return Promise.resolve();
+		}
+
+		var parentDomId = getParentDomId(parentRow);
+		var button = root.querySelector('[data-pat-toggle-children][data-pat-target="' + parentDomId + '"]');
+		var parentId = getParentIdFromRow(parentRow);
+
+		if (!button || !parentId) {
+			return Promise.resolve();
+		}
+
+		var childRows = getChildRowsByParentDomId(parentDomId);
+		var variationState = getVariationState(parentId);
+
+		if (childRows.length) {
+			updateToggleButton(button, true);
+			parentRow.classList.add('is-open');
+			setHidden(root, childRows, false);
+			return Promise.resolve();
+		}
+
+		if (variationState.loaded && variationState.html) {
+			childRows = insertVariationMarkup(parentRow, variationState.html);
+			snapshotEditableFields(root);
+			refreshSelectionAfterDomChange(root);
+			updateToggleButton(button, true);
+			parentRow.classList.add('is-open');
+			setHidden(root, childRows, false);
+			return Promise.resolve();
+		}
+
+		if (variationState.loading) {
+			return Promise.resolve();
+		}
+
+		markVariationLoading(parentId, 'Loading variations...');
+
+		return requestVariations(parentId).then(function (response) {
+			var payload = response && response.data && !Array.isArray(response.rows) ? response.data : response;
+			var rows = payload && Array.isArray(payload.rows) ? payload.rows : [];
+			var html = payload && payload.html ? payload.html : '';
+			var message = payload && payload.message ? payload.message : '';
+
+			if (!payload || !payload.success) {
+				throw new Error(message || 'Variation load failed.');
 			}
 
-			parents.push(row);
-		});
+			cacheVariationRows(parentId, rows, html);
 
-		return parents;
+			if (html) {
+				childRows = insertVariationMarkup(parentRow, html);
+				snapshotEditableFields(root);
+				refreshSelectionAfterDomChange(root);
+			} else {
+				childRows = getChildRowsByParentDomId(parentDomId);
+			}
+
+			updateToggleButton(button, true);
+			parentRow.classList.add('is-open');
+			setHidden(root, childRows, false);
+			syncVariationRowState(parentId, {
+				status: 'loaded',
+				message: message
+			});
+		});
+	}
+
+	function handleOpenEditorClick(root) {
+		var parents = getSelectedParentRows(root);
+
+		if (!parents.length) {
+			updateToolbar(root, 'idle', 'Select at least one parent row to open in editor.');
+			return;
+		}
+
+		updateToolbar(root, 'saving', 'Loading selected parents into editor...');
+
+		parents.reduce(function (promise, parentRow) {
+			return promise.then(function () {
+				return ensureParentExpanded(root, parentRow);
+			});
+		}, Promise.resolve()).then(function () {
+			updateToolbar(root, getEditorState(root), 'Selected parents opened for spreadsheet editing.');
+		}).catch(function (error) {
+			updateToolbar(root, 'error', error && error.message ? error.message : 'Could not open selected parents in editor.');
+		});
 	}
 
 	function updateGenerateButton(root) {
@@ -1811,6 +1991,194 @@
 			markVariationError(parentId, error && error.message ? error.message : 'Variation load failed.');
 			updateToggleButton(button, false);
 			parentRow.classList.remove('is-open');
+		});
+	}
+
+	function requestSaveHistory() {
+		if (!window.PATAdmin || !window.PATAdmin.ajaxUrl || !window.PATAdmin.historyAction) {
+			return Promise.resolve({ success: false, batches: [] });
+		}
+
+		var formData = new window.FormData();
+		formData.append('action', window.PATAdmin.historyAction);
+		formData.append(window.PATAdmin.historyNonceField || 'nonce', window.PATAdmin.historyNonce || '');
+
+		return window.fetch(window.PATAdmin.ajaxUrl, {
+			method: 'POST',
+			credentials: 'same-origin',
+			body: formData
+		}).then(function (response) {
+			return response.json().catch(function () {
+				return { success: false, batches: [] };
+			});
+		});
+	}
+
+	function escapeHistoryHtml(str) {
+		return String(str)
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;');
+	}
+
+	function formatHistoryBatchTime(raw) {
+		if (!raw) {
+			return '—';
+		}
+
+		var d = new Date(String(raw).replace(' ', 'T') + 'Z');
+
+		if (isNaN(d.getTime())) {
+			return String(raw);
+		}
+
+		return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+	}
+
+	function renderHistoryPanel(root, response) {
+		var panel = root.querySelector('[data-pat-history-panel]');
+
+		if (!panel) {
+			return;
+		}
+
+		var list = panel.querySelector('[data-pat-history-list]');
+
+		if (!list) {
+			return;
+		}
+
+		var payload = response && response.data && !Array.isArray(response.batches) ? response.data : response;
+		var batches = payload && Array.isArray(payload.batches) ? payload.batches : [];
+
+		if (!batches.length) {
+			list.innerHTML = '<p class="pat-history-empty">No save history found.</p>';
+			return;
+		}
+
+		var html = '<table class="pat-history-table">';
+		html += '<thead><tr>';
+		html += '<th>Type</th>';
+		html += '<th>Time</th>';
+		html += '<th>Products</th>';
+		html += '<th>Fields</th>';
+		html += '<th></th>';
+		html += '</tr></thead><tbody>';
+
+		batches.forEach(function (batch) {
+			var actionType = batch && batch.action_type ? String(batch.action_type) : 'save';
+			var actionLabel = 'save' === actionType ? 'Save' : 'Undo';
+			var isUndoable = batch && batch.undoable;
+			var batchId = batch && batch.batch_id ? String(batch.batch_id) : '';
+
+			html += '<tr class="pat-history-entry">';
+			html += '<td><span class="pat-history-action-type pat-history-action-' + escapeHistoryHtml(actionType) + '">' + escapeHistoryHtml(actionLabel) + '</span>';
+
+			if (isUndoable) {
+				html += ' <span class="pat-history-undoable-badge">&#x2713; undoable</span>';
+			}
+
+			html += '</td>';
+			html += '<td class="pat-history-time">' + escapeHistoryHtml(formatHistoryBatchTime(batch && batch.batch_time ? batch.batch_time : '')) + '</td>';
+			html += '<td class="pat-history-stat">' + (batch && batch.entity_count ? Number(batch.entity_count) : 0) + '</td>';
+			html += '<td class="pat-history-stat">' + (batch && batch.field_count ? Number(batch.field_count) : 0) + '</td>';
+			html += '<td class="pat-history-actions">';
+
+			if (isUndoable && batchId) {
+				html += '<button type="button" class="button button-small" data-pat-undo-batch-id="' + escapeHistoryHtml(batchId) + '">Undo</button>';
+			}
+
+			html += '</td>';
+			html += '</tr>';
+		});
+
+		html += '</tbody></table>';
+		list.innerHTML = html;
+	}
+
+	function isHistoryPanelOpen(root) {
+		var panel = root.querySelector('[data-pat-history-panel]');
+		return panel && !panel.hidden;
+	}
+
+	function openHistoryPanel(root) {
+		var panel = root.querySelector('[data-pat-history-panel]');
+
+		if (!panel) {
+			return;
+		}
+
+		panel.hidden = false;
+		var list = panel.querySelector('[data-pat-history-list]');
+
+		if (list) {
+			list.innerHTML = '<p class="pat-history-loading">Loading history…</p>';
+		}
+
+		requestSaveHistory().then(function (response) {
+			renderHistoryPanel(root, response);
+		}).catch(function () {
+			var panel2 = root.querySelector('[data-pat-history-panel]');
+			var list2 = panel2 && panel2.querySelector('[data-pat-history-list]');
+
+			if (list2) {
+				list2.innerHTML = '<p class="pat-history-error">Could not load history.</p>';
+			}
+		});
+	}
+
+	function closeHistoryPanel(root) {
+		var panel = root.querySelector('[data-pat-history-panel]');
+
+		if (panel) {
+			panel.hidden = true;
+		}
+	}
+
+	function refreshHistoryPanelIfOpen(root) {
+		if (isHistoryPanelOpen(root)) {
+			requestSaveHistory().then(function (response) {
+				renderHistoryPanel(root, response);
+			});
+		}
+	}
+
+	function bindHistoryPanel(root) {
+		var historyTrigger = root.querySelector('[data-pat-history-trigger]');
+
+		if (historyTrigger) {
+			historyTrigger.addEventListener('click', function (event) {
+				event.preventDefault();
+
+				if (isHistoryPanelOpen(root)) {
+					closeHistoryPanel(root);
+				} else {
+					openHistoryPanel(root);
+				}
+			});
+		}
+
+		root.addEventListener('click', function (event) {
+			if (!root.contains(event.target)) {
+				return;
+			}
+
+			var closeBtn = event.target.closest('[data-pat-history-close]');
+
+			if (closeBtn) {
+				event.preventDefault();
+				closeHistoryPanel(root);
+				return;
+			}
+
+			var undoBtn = event.target.closest('[data-pat-undo-batch-id]');
+
+			if (undoBtn) {
+				event.preventDefault();
+				closeHistoryPanel(root);
+				handleUndoClick(root);
+			}
 		});
 	}
 

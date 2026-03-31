@@ -25,6 +25,14 @@ define( 'PAT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 require_once PAT_PLUGIN_PATH . 'includes/core/class-pat-loader.php';
 PAT_Loader::init();
 
+function pat_activate(): void {
+	if ( class_exists( 'PAT_Save_History_Store' ) && method_exists( 'PAT_Save_History_Store', 'install' ) ) {
+		PAT_Save_History_Store::install();
+	}
+}
+
+register_activation_hook( __FILE__, 'pat_activate' );
+
 function pat(): PAT_Plugin {
 	return PAT_Plugin::instance();
 }

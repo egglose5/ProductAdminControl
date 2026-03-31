@@ -10,6 +10,15 @@ class PAT_Save_Controller {
 	const NONCE_FIELD  = 'nonce';
 
 	/**
+	 * @var PAT_Save_History_Store|null
+	 */
+	private $history_store;
+
+	public function __construct() {
+		$this->history_store = class_exists( 'PAT_Save_History_Store' ) ? new PAT_Save_History_Store() : null;
+	}
+
+	/**
 	 * Register the authenticated AJAX hook.
 	 */
 	public function register(): void {
@@ -48,9 +57,18 @@ class PAT_Save_Controller {
 
 		$results = array();
 		$overall_success = true;
+		$batch_id = class_exists( 'PAT_Save_History_Store' ) ? PAT_Save_History_Store::generate_batch_id( 'save' ) : '';
+		$user_id = get_current_user_id();
+		$has_logged_changes = false;
 
 		foreach ( $rows as $index => $row ) {
-			$result = $this->save_row( $row, $index );
+			$result = $this->save_row( $row, $index, $batch_id, $user_id );
+
+			if ( ! empty( $result['_pat_history_logged'] ) ) {
+				$has_logged_changes = true;
+			}
+
+			unset( $result['_pat_history_logged'] );
 			$results[] = $result;
 
 			if ( isset( $result['status'] ) && 'error' === $result['status'] ) {
@@ -58,10 +76,15 @@ class PAT_Save_Controller {
 			}
 		}
 
+		if ( $has_logged_changes && $this->history_store && '' !== $batch_id ) {
+			$this->history_store->push_undo_batch( $user_id, $batch_id );
+		}
+
 		wp_send_json(
 			array(
 				'success' => $overall_success,
 				'results' => $results,
+				'batch_id' => $batch_id,
 			),
 			$overall_success ? 200 : 207
 		);
@@ -74,10 +97,12 @@ class PAT_Save_Controller {
 	 * @param int   $index Row index.
 	 * @return array<string, mixed>
 	 */
-	private function save_row( $row, int $index ): array {
+	private function save_row( $row, int $index, string $batch_id, int $user_id ): array {
 		$normalized = $this->normalize_row( $row );
 
 		if ( is_wp_error( $normalized ) ) {
+			$this->log_row_error( $batch_id, '', 0, $user_id, $normalized->get_error_message(), array( 'index' => $index ) );
+
 			return $this->build_result(
 				$index,
 				0,
@@ -95,10 +120,24 @@ class PAT_Save_Controller {
 		$row_type = $normalized['row_type'];
 		$changes  = $normalized['changes'];
 		$client_row_id = isset( $normalized['client_row_id'] ) ? (string) $normalized['client_row_id'] : (string) $row_id;
+		$before_values = $this->capture_entity_values_before_save( $normalized );
 
 		$service_result = $this->dispatch_to_service( $normalized );
 
 		if ( is_wp_error( $service_result ) ) {
+			$this->log_row_error(
+				$batch_id,
+				$row_type,
+				$row_id,
+				$user_id,
+				$service_result->get_error_message(),
+				array(
+					'index'         => $index,
+					'changes'       => $changes,
+					'client_row_id' => $client_row_id,
+				)
+			);
+
 			return $this->build_result(
 				$index,
 				$row_id,
@@ -113,20 +152,260 @@ class PAT_Save_Controller {
 		}
 
 		$result_id = isset( $service_result['id'] ) ? $service_result['id'] : $row_id;
+		$status = isset( $service_result['status'] ) ? (string) $service_result['status'] : 'saved';
+		$history_logged = false;
+
+		if ( 'saved' === $status ) {
+			$history_logged = $this->log_successful_field_changes(
+				$batch_id,
+				$row_type,
+				absint( $result_id ),
+				$user_id,
+				$changes,
+				$before_values,
+				isset( $service_result['data'] ) && is_array( $service_result['data'] ) ? $service_result['data'] : array(),
+				$normalized
+			);
+		} else {
+			$this->log_row_error(
+				$batch_id,
+				$row_type,
+				$row_id,
+				$user_id,
+				isset( $service_result['message'] ) ? (string) $service_result['message'] : __( 'Save failed.', 'product-admin-tool' ),
+				array(
+					'index'   => $index,
+					'changes' => $changes,
+					'errors'  => isset( $service_result['errors'] ) && is_array( $service_result['errors'] ) ? $service_result['errors'] : array(),
+				)
+			);
+		}
 
 		return $this->build_result(
 			$index,
 			$result_id,
-			isset( $service_result['status'] ) ? (string) $service_result['status'] : 'saved',
+			$status,
 			isset( $service_result['message'] ) ? (string) $service_result['message'] : __( 'Saved successfully.', 'product-admin-tool' ),
 			array(
 				'row_type' => $row_type,
 				'changes'  => $changes,
+				'batch_id' => $batch_id,
+				'_pat_history_logged' => $history_logged,
 				'client_row_id' => isset( $service_result['client_row_id'] ) ? (string) $service_result['client_row_id'] : $client_row_id,
 				'data'     => isset( $service_result['data'] ) && is_array( $service_result['data'] ) ? $service_result['data'] : array(),
 				'errors'   => isset( $service_result['errors'] ) && is_array( $service_result['errors'] ) ? $service_result['errors'] : array(),
 			)
 		);
+	}
+
+	/**
+	 * Capture current values for fields before save.
+	 *
+	 * @param array<string, mixed> $row Normalized row.
+	 * @return array<string, mixed>
+	 */
+	private function capture_entity_values_before_save( array $row ): array {
+		$fields = array_keys( isset( $row['changes'] ) && is_array( $row['changes'] ) ? $row['changes'] : array() );
+
+		if ( empty( $fields ) ) {
+			return array();
+		}
+
+		$row_type = isset( $row['row_type'] ) ? sanitize_key( (string) $row['row_type'] ) : '';
+		$row_id = isset( $row['id'] ) ? absint( $row['id'] ) : 0;
+
+		if ( 'variation' === $row_type && ! empty( $row['is_generated'] ) ) {
+			return array();
+		}
+
+		return $this->fetch_entity_values( $row_type, $row_id, $fields );
+	}
+
+	/**
+	 * Fetch current entity values from WooCommerce models.
+	 *
+	 * @param string   $row_type Row type.
+	 * @param int      $row_id Entity id.
+	 * @param string[] $fields Fields to fetch.
+	 * @return array<string, mixed>
+	 */
+	private function fetch_entity_values( string $row_type, int $row_id, array $fields ): array {
+		if ( $row_id <= 0 || ! function_exists( 'wc_get_product' ) ) {
+			return array();
+		}
+
+		$product = wc_get_product( $row_id );
+
+		if ( ! $product || ! is_object( $product ) ) {
+			return array();
+		}
+
+		$values = array();
+
+		foreach ( $fields as $field ) {
+			switch ( $field ) {
+				case 'title':
+					$values['title'] = method_exists( $product, 'get_name' ) ? (string) $product->get_name() : '';
+					break;
+
+				case 'sku':
+					$values['sku'] = method_exists( $product, 'get_sku' ) ? (string) $product->get_sku() : '';
+					break;
+
+				case 'status':
+					$values['status'] = method_exists( $product, 'get_status' ) ? (string) $product->get_status() : '';
+					break;
+
+				case 'regular_price':
+					$values['regular_price'] = method_exists( $product, 'get_regular_price' ) ? (string) $product->get_regular_price() : '';
+					break;
+
+				case 'sale_price':
+					$values['sale_price'] = method_exists( $product, 'get_sale_price' ) ? (string) $product->get_sale_price() : '';
+					break;
+
+				case 'stock_quantity':
+					$values['stock_quantity'] = method_exists( $product, 'get_stock_quantity' ) ? $product->get_stock_quantity() : '';
+					break;
+
+				case 'weight':
+					$values['weight'] = method_exists( $product, 'get_weight' ) ? (string) $product->get_weight() : '';
+					break;
+
+				case 'length':
+					$values['length'] = method_exists( $product, 'get_length' ) ? (string) $product->get_length() : '';
+					break;
+
+				case 'width':
+					$values['width'] = method_exists( $product, 'get_width' ) ? (string) $product->get_width() : '';
+					break;
+
+				case 'height':
+					$values['height'] = method_exists( $product, 'get_height' ) ? (string) $product->get_height() : '';
+					break;
+
+				case 'shipping_class_id':
+					$values['shipping_class_id'] = method_exists( $product, 'get_shipping_class_id' ) ? (int) $product->get_shipping_class_id() : 0;
+					break;
+
+				case 'package_type':
+					$values['package_type'] = (string) get_post_meta( $row_id, '_pat_package_type', true );
+					break;
+
+				case 'menu_order':
+					$values['menu_order'] = method_exists( $product, 'get_menu_order' ) ? (int) $product->get_menu_order() : 0;
+					break;
+			}
+		}
+
+		if ( 'variation' === $row_type && method_exists( $product, 'get_parent_id' ) ) {
+			$values['parent_id'] = (int) $product->get_parent_id();
+		}
+
+		return $values;
+	}
+
+	/**
+	 * Persist field-level history entries for successful saves.
+	 *
+	 * @param array<string, mixed> $changes Requested changes.
+	 * @param array<string, mixed> $before_values Values before save.
+	 * @param array<string, mixed> $service_data Values returned after save.
+	 * @param array<string, mixed> $normalized_row Row payload.
+	 */
+	private function log_successful_field_changes( string $batch_id, string $row_type, int $row_id, int $user_id, array $changes, array $before_values, array $service_data, array $normalized_row ): bool {
+		if ( ! $this->history_store || '' === $batch_id ) {
+			return false;
+		}
+
+		$fields = array_keys( $changes );
+
+		if ( empty( $fields ) ) {
+			return false;
+		}
+
+		$after_values = $this->fetch_entity_values( $row_type, $row_id, $fields );
+
+		foreach ( $fields as $field ) {
+			if ( ! array_key_exists( $field, $after_values ) && array_key_exists( $field, $service_data ) ) {
+				$after_values[ $field ] = $service_data[ $field ];
+			}
+		}
+
+		$history_changes = array();
+		$parent_id = 0;
+
+		if ( 'variation' === $row_type ) {
+			$parent_id = isset( $service_data['parent_id'] ) ? absint( $service_data['parent_id'] ) : ( isset( $normalized_row['parent_id'] ) ? absint( $normalized_row['parent_id'] ) : 0 );
+		}
+
+		foreach ( $fields as $field ) {
+			$old_value = $before_values[ $field ] ?? '';
+			$new_value = $after_values[ $field ] ?? ( $service_data[ $field ] ?? ( $changes[ $field ] ?? '' ) );
+
+			if ( $this->normalize_history_value( $old_value ) === $this->normalize_history_value( $new_value ) ) {
+				continue;
+			}
+
+			$history_changes[] = array(
+				'field_key' => $field,
+				'old_value' => $old_value,
+				'new_value' => $new_value,
+				'parent_id' => $parent_id,
+			);
+		}
+
+		if ( empty( $history_changes ) ) {
+			return false;
+		}
+
+		$written = $this->history_store->log_field_changes(
+			$batch_id,
+			'save',
+			$row_type,
+			$row_id,
+			$user_id,
+			$history_changes,
+			array(
+				'request_action' => self::AJAX_ACTION,
+			)
+		);
+
+		return $written > 0;
+	}
+
+	/**
+	 * Log failed row save attempts.
+	 *
+	 * @param array<string, mixed> $context Context payload.
+	 */
+	private function log_row_error( string $batch_id, string $row_type, int $row_id, int $user_id, string $message, array $context = array() ): void {
+		if ( ! $this->history_store || '' === $batch_id ) {
+			return;
+		}
+
+		$this->history_store->log_error( $batch_id, $row_type, $row_id, $user_id, $message, $context );
+	}
+
+	/**
+	 * Convert history values to comparable strings.
+	 *
+	 * @param mixed $value Raw value.
+	 */
+	private function normalize_history_value( $value ): string {
+		if ( null === $value ) {
+			return '';
+		}
+
+		if ( is_bool( $value ) ) {
+			return $value ? '1' : '0';
+		}
+
+		if ( is_scalar( $value ) ) {
+			return trim( (string) $value );
+		}
+
+		return wp_json_encode( $value );
 	}
 
 	/**

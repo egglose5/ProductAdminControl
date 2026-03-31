@@ -527,3 +527,129 @@
 	color: #14532d;
 	font-weight: 500;
 }
+/* ── History panel ──────────────────────────────────────────────── */
+.pat-admin-shell .pat-history-panel,
+.pat-product-editor .pat-history-panel {
+        background: #fff;
+        border: 1px solid #dcdcdc;
+        border-radius: 3px;
+        margin-bottom: 12px;
+        padding: 12px 14px 14px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.pat-admin-shell .pat-history-panel-header,
+.pat-product-editor .pat-history-panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 10px;
+        font-size: 13px;
+}
+
+.pat-admin-shell .pat-history-panel-close,
+.pat-product-editor .pat-history-panel-close {
+        cursor: pointer;
+        font-size: 16px;
+        line-height: 1;
+        color: #666;
+        padding: 0 2px;
+        background: none;
+        border: none;
+}
+
+.pat-admin-shell .pat-history-panel-close:hover,
+.pat-product-editor .pat-history-panel-close:hover {
+        color: #c00;
+}
+
+.pat-admin-shell .pat-history-list,
+.pat-product-editor .pat-history-list {
+        max-height: 260px;
+        overflow-y: auto;
+}
+
+.pat-admin-shell .pat-history-loading,
+.pat-product-editor .pat-history-loading,
+.pat-admin-shell .pat-history-empty,
+.pat-product-editor .pat-history-empty,
+.pat-admin-shell .pat-history-error,
+.pat-product-editor .pat-history-error {
+        margin: 0;
+        font-size: 13px;
+        color: #666;
+        padding: 4px 0;
+}
+
+.pat-admin-shell .pat-history-error,
+.pat-product-editor .pat-history-error {
+        color: #c00;
+}
+
+.pat-admin-shell .pat-history-table,
+.pat-product-editor .pat-history-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+}
+
+.pat-admin-shell .pat-history-table thead th,
+.pat-product-editor .pat-history-table thead th {
+        text-align: left;
+        padding: 4px 8px;
+        border-bottom: 1px solid #e0e0e0;
+        color: #555;
+        font-weight: 600;
+}
+
+.pat-admin-shell .pat-history-entry td,
+.pat-product-editor .pat-history-entry td {
+        padding: 5px 8px;
+        border-bottom: 1px solid #f5f5f5;
+        vertical-align: middle;
+}
+
+.pat-admin-shell .pat-history-entry:last-child td,
+.pat-product-editor .pat-history-entry:last-child td {
+        border-bottom: none;
+}
+
+.pat-admin-shell .pat-history-action-type,
+.pat-product-editor .pat-history-action-type {
+        font-weight: 600;
+}
+
+.pat-admin-shell .pat-history-action-save,
+.pat-product-editor .pat-history-action-save {
+        color: #1a7431;
+}
+
+.pat-admin-shell .pat-history-action-undo,
+.pat-product-editor .pat-history-action-undo {
+        color: #856404;
+}
+
+.pat-admin-shell .pat-history-undoable-badge,
+.pat-product-editor .pat-history-undoable-badge {
+        font-size: 11px;
+        color: #2271b1;
+        margin-left: 4px;
+}
+
+.pat-admin-shell .pat-history-time,
+.pat-product-editor .pat-history-time {
+        color: #555;
+        white-space: nowrap;
+}
+
+.pat-admin-shell .pat-history-stat,
+.pat-product-editor .pat-history-stat {
+        color: #555;
+        text-align: right;
+}
+
+.pat-admin-shell .pat-history-actions,
+.pat-product-editor .pat-history-actions {
+        text-align: right;
+        white-space: nowrap;
+}
