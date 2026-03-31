@@ -237,7 +237,9 @@ class PAT_Product_Save_Service {
 					break;
 
 				case 'package_type':
-					if ( method_exists( $product, 'get_id' ) ) {
+					if ( method_exists( $product, 'update_meta_data' ) ) {
+						$product->update_meta_data( '_pat_package_type', sanitize_text_field( (string) $value ) );
+					} elseif ( method_exists( $product, 'get_id' ) ) {
 						update_post_meta( $product->get_id(), '_pat_package_type', sanitize_text_field( (string) $value ) );
 					}
 					break;

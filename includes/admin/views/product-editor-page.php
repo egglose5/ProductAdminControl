@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 			<span class="pat-save-count" data-pat-dirty-count="true"><?php esc_html_e( '0 changed rows', 'product-admin-tool' ); ?></span>
 			<span class="pat-save-count" data-pat-selected-count="true"><?php esc_html_e( '0 selected rows', 'product-admin-tool' ); ?></span>
 		</div>
-		<span class="description"><?php esc_html_e( 'Only dirty rows will be included in the next batch save. Parent product rows are the primary Phase 3 target; variation editing remains scaffolded but secondary.', 'product-admin-tool' ); ?></span>
+		<span class="description"><?php esc_html_e( 'Nothing is written until Save changes is pressed. Only dirty rows are included in a save batch, and recent saves are recorded in the history ledger below.', 'product-admin-tool' ); ?></span>
 	</div>
 
 	<?php if ( $filters instanceof PAT_Product_Filters ) : ?>
@@ -43,7 +43,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 	<div class="pat-history-panel" data-pat-history-panel="true" hidden aria-label="<?php esc_attr_e( 'Save history', 'product-admin-tool' ); ?>">
 		<div class="pat-history-panel-header">
-			<strong><?php esc_html_e( 'Recent Save History', 'product-admin-tool' ); ?></strong>
+			<strong><?php esc_html_e( 'Recent Save Ledger', 'product-admin-tool' ); ?></strong>
 			<button type="button" class="button-link pat-history-panel-close" data-pat-history-close="true" aria-label="<?php esc_attr_e( 'Close history panel', 'product-admin-tool' ); ?>">&#x2715;</button>
 		</div>
 		<div class="pat-history-list" data-pat-history-list="true">

@@ -84,10 +84,11 @@ class PAT_Undo_Controller {
 			);
 		}
 
-		$inverse_rows = $this->build_inverse_rows( $entries );
-		$results      = array();
-		$overall_success = true;
-		$undo_batch_id = PAT_Save_History_Store::generate_batch_id( 'undo' );
+		$inverse_rows     = $this->build_inverse_rows( $entries );
+		$results          = array();
+		$overall_success  = true;
+		$undo_batch_id    = PAT_Save_History_Store::generate_batch_id( 'undo' );
+		$applied_rows     = array();
 
 		foreach ( $inverse_rows as $row_key => $row ) {
 			$service_result = $this->dispatch_undo_row( $row );
@@ -103,10 +104,26 @@ class PAT_Undo_Controller {
 				'message'       => isset( $service_result['message'] ) ? (string) $service_result['message'] : __( 'Undo failed for row.', 'product-admin-tool' ),
 				'data'          => isset( $service_result['data'] ) && is_array( $service_result['data'] ) ? $service_result['data'] : array(),
 				'errors'        => isset( $service_result['errors'] ) && is_array( $service_result['errors'] ) ? $service_result['errors'] : array(),
+				'_pat_undo_row' => $row,
 			);
 
 			if ( ! in_array( $status, array( 'saved', 'deleted' ), true ) ) {
 				$overall_success = false;
+				$rollback = $this->rollback_applied_undo_rows( $applied_rows );
+				$error_message = ! empty( $rollback['success'] )
+					? __( 'Undo canceled because one row failed. Completed undo changes were rolled back.', 'product-admin-tool' )
+					: __( 'Undo failed and automatic rollback could not fully complete. Review the affected rows before continuing.', 'product-admin-tool' );
+
+				foreach ( $applied_rows as $applied_index => $applied_row ) {
+					if ( isset( $results[ $applied_index ] ) && is_array( $results[ $applied_index ] ) ) {
+						$results[ $applied_index ]['status']  = 'error';
+						$results[ $applied_index ]['message'] = $error_message;
+						$results[ $applied_index ]['errors']  = array(
+							'row' => $error_message,
+						);
+					}
+				}
+
 				$store->log_error(
 					$undo_batch_id,
 					$row['row_type'],
@@ -116,61 +133,92 @@ class PAT_Undo_Controller {
 					array(
 						'source_batch_id' => $batch_id,
 						'row_key'         => $row_key,
+						'rolled_back'     => ! empty( $rollback['success'] ),
 					)
 				);
-				continue;
+
+				if ( empty( $rollback['success'] ) ) {
+					foreach ( $rollback['errors'] as $rollback_error ) {
+						$store->log_error(
+							$undo_batch_id,
+							isset( $rollback_error['row_type'] ) ? (string) $rollback_error['row_type'] : '',
+							isset( $rollback_error['id'] ) ? absint( $rollback_error['id'] ) : 0,
+							$user_id,
+							isset( $rollback_error['message'] ) ? (string) $rollback_error['message'] : __( 'Undo rollback failed.', 'product-admin-tool' ),
+							array(
+								'source_batch_id' => $batch_id,
+								'rollback'        => true,
+							)
+						);
+					}
+				}
+
+				break;
 			}
 
-			if ( 'deleted' === $status ) {
+			$applied_rows[] = array(
+				'result_index' => count( $results ) - 1,
+				'row'          => $row,
+				'row_id'       => $row_id,
+			);
+		}
+
+		if ( $overall_success ) {
+			foreach ( $applied_rows as $applied_row ) {
+				$row      = $applied_row['row'];
+				$row_id   = isset( $applied_row['row_id'] ) ? absint( $applied_row['row_id'] ) : absint( $row['id'] );
+
+				if ( 'delete_created_variation' === ( isset( $row['undo_strategy'] ) ? sanitize_key( (string) $row['undo_strategy'] ) : '' ) ) {
+					$store->log_field_changes(
+						$undo_batch_id,
+						'undo',
+						$row['row_type'],
+						$row_id,
+						$user_id,
+						array(
+							array(
+								'field_key' => 'entity_state',
+								'old_value' => 'created',
+								'new_value' => 'deleted',
+								'parent_id' => isset( $row['parent_id'] ) ? absint( $row['parent_id'] ) : 0,
+							),
+						),
+						array(
+							'source_batch_id' => $batch_id,
+						)
+					);
+					continue;
+				}
+
+				$changes  = array();
+
+				foreach ( $row['changes'] as $field_key => $field_value ) {
+					$forward   = $row['forward_changes'][ $field_key ] ?? array();
+					$changes[] = array(
+						'field_key' => $field_key,
+						'old_value' => $forward['new_value'] ?? '',
+						'new_value' => $forward['old_value'] ?? $field_value,
+						'parent_id' => isset( $row['parent_id'] ) ? absint( $row['parent_id'] ) : 0,
+					);
+				}
+
 				$store->log_field_changes(
 					$undo_batch_id,
 					'undo',
 					$row['row_type'],
 					$row_id,
 					$user_id,
-					array(
-						array(
-							'field_key' => 'entity_state',
-							'old_value' => 'created',
-							'new_value' => 'deleted',
-							'parent_id' => isset( $row['parent_id'] ) ? absint( $row['parent_id'] ) : 0,
-						),
-					),
+					$changes,
 					array(
 						'source_batch_id' => $batch_id,
 					)
 				);
-				continue;
 			}
 
-			$undo_changes = array();
-
-			foreach ( $row['changes'] as $field_key => $field_value ) {
-				$forward = $row['forward_changes'][ $field_key ] ?? array();
-				$undo_changes[] = array(
-					'field_key' => $field_key,
-					'old_value' => $forward['new_value'] ?? '',
-					'new_value' => $forward['old_value'] ?? $field_value,
-					'parent_id' => isset( $row['parent_id'] ) ? absint( $row['parent_id'] ) : 0,
-				);
-			}
-
-			$store->log_field_changes(
-				$undo_batch_id,
-				'undo',
-				$row['row_type'],
-				$row_id,
-				$user_id,
-				$undo_changes,
-				array(
-					'source_batch_id' => $batch_id,
-				)
-			);
-		}
-
-		if ( $overall_success ) {
 			$store->pop_undo_batch( $user_id );
 		}
+
+		$results = array_map( array( $this, 'strip_internal_result_metadata' ), $results );
 
 		wp_send_json(
 			array(
@@ -180,9 +228,9 @@ class PAT_Undo_Controller {
 				'undone_batch_id'=> $batch_id,
 				'message'        => $overall_success
 					? __( 'Undo completed successfully.', 'product-admin-tool' )
-					: __( 'Undo completed with errors. Resolve row issues before retrying.', 'product-admin-tool' ),
+					: __( 'Undo was canceled because one or more rows failed.', 'product-admin-tool' ),
 			),
-			$overall_success ? 200 : 207
+			$overall_success ? 200 : 409
 		);
 	}
 
@@ -328,6 +376,64 @@ class PAT_Undo_Controller {
 			'message' => __( 'Save service does not expose a supported method for undo.', 'product-admin-tool' ),
 			'errors'  => array( 'service' => __( 'Save service does not expose a supported method for undo.', 'product-admin-tool' ) ),
 		);
+	}
+
+	/**
+	 * Re-apply forward changes if an undo batch fails mid-stream.
+	 *
+	 * @param array<int, array<string, mixed>> $applied_rows Successfully undone rows.
+	 * @return array<string, mixed>
+	 */
+	private function rollback_applied_undo_rows( array $applied_rows ): array {
+		$errors = array();
+
+		foreach ( array_reverse( $applied_rows ) as $applied_row ) {
+			$row      = isset( $applied_row['row'] ) && is_array( $applied_row['row'] ) ? $applied_row['row'] : array();
+			$row_type = isset( $row['row_type'] ) ? sanitize_key( (string) $row['row_type'] ) : '';
+			$row_id   = isset( $applied_row['row_id'] ) ? absint( $applied_row['row_id'] ) : ( isset( $row['id'] ) ? absint( $row['id'] ) : 0 );
+			$changes  = array();
+
+			foreach ( isset( $row['forward_changes'] ) && is_array( $row['forward_changes'] ) ? $row['forward_changes'] : array() as $field_key => $forward_change ) {
+				$changes[ $field_key ] = $forward_change['new_value'] ?? '';
+			}
+
+			if ( empty( $changes ) ) {
+				continue;
+			}
+
+			$rollback_result = $this->dispatch_to_service(
+				array(
+					'id'       => $row_id,
+					'row_type' => $row_type,
+					'parent_id'=> isset( $row['parent_id'] ) ? absint( $row['parent_id'] ) : 0,
+					'changes'  => $changes,
+				)
+			);
+
+			if ( is_wp_error( $rollback_result ) || ! isset( $rollback_result['status'] ) || 'saved' !== $rollback_result['status'] ) {
+				$errors[] = array(
+					'row_type' => $row_type,
+					'id'       => $row_id,
+					'message'  => is_wp_error( $rollback_result )
+						? $rollback_result->get_error_message()
+						: ( isset( $rollback_result['message'] ) ? (string) $rollback_result['message'] : __( 'Undo rollback failed.', 'product-admin-tool' ) ),
+				);
+			}
+		}
+
+		return array(
+			'success' => empty( $errors ),
+			'errors'  => $errors,
+		);
+	}
+
+	/**
+	 * Remove controller-only metadata before returning JSON.
+	 */
+	private function strip_internal_result_metadata( array $result ): array {
+		unset( $result['_pat_undo_row'] );
+
+		return $result;
 	}
 
 	/**

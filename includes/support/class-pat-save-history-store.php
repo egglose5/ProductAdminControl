@@ -294,28 +294,37 @@ class PAT_Save_History_Store {
 	public function get_recent_batches( int $user_id, int $limit = 10 ): array {
 		global $wpdb;
 
-		if ( $user_id <= 0 || ! isset( $wpdb ) ) {
+		if ( ! isset( $wpdb ) ) {
 			return array();
 		}
 
 		$limit = max( 1, min( 50, $limit ) );
 
 		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- table_name is derived from $wpdb->prefix, not user input.
+		$where_sql = '';
+		$args      = array();
+
+		if ( $user_id > 0 ) {
+			$where_sql = ' AND user_id = %d';
+			$args[]    = $user_id;
+		}
+
+		$args[] = $limit;
+
 		$sql = $wpdb->prepare(
 			'SELECT batch_id,
 			        action_type,
+			        MAX(user_id) AS actor_user_id,
 			        MIN(created_at) AS batch_time,
-			        COUNT(DISTINCT entity_id) AS entity_count,
-			        COUNT(*) AS field_count
+			        COUNT(DISTINCT CASE WHEN entity_id > 0 THEN CONCAT(row_type, \':\', entity_id) ELSE NULL END) AS entity_count,
+			        SUM(CASE WHEN field_key <> \'\' THEN 1 ELSE 0 END) AS field_count,
+			        COUNT(*) AS entry_count
 			 FROM ' . self::table_name() . '
-			 WHERE user_id = %d
-			   AND action_type IN (\'save\', \'undo\')
-			   AND field_key <> \'\'
+			 WHERE action_type IN (\'save\', \'undo\', \'save_error\')' . $where_sql . '
 			 GROUP BY batch_id, action_type
 			 ORDER BY batch_time DESC
 			 LIMIT %d',
-			$user_id,
-			$limit
+			...$args
 		);
 		// phpcs:enable
 
@@ -329,7 +338,68 @@ class PAT_Save_History_Store {
 			static function ( array $row ): array {
 				$row['entity_count'] = (int) ( $row['entity_count'] ?? 0 );
 				$row['field_count']  = (int) ( $row['field_count'] ?? 0 );
+				$row['entry_count']  = (int) ( $row['entry_count'] ?? 0 );
+				$row['actor_user_id'] = (int) ( $row['actor_user_id'] ?? 0 );
 				$row['batch_time']   = isset( $row['batch_time'] ) ? (string) $row['batch_time'] : '';
+				$user                = $row['actor_user_id'] > 0 ? get_userdata( $row['actor_user_id'] ) : false;
+				$row['actor_name']   = $user && isset( $user->display_name ) ? (string) $user->display_name : '';
+
+				return $row;
+			},
+			$rows
+		);
+	}
+
+	/**
+	 * Retrieve all stored entries for a batch with actor and value details.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function get_batch_entries( string $batch_id ): array {
+		global $wpdb;
+
+		if ( '' === $batch_id || ! isset( $wpdb ) ) {
+			return array();
+		}
+
+		$sql = $wpdb->prepare(
+			"SELECT id, batch_id, action_type, row_type, entity_id, parent_id, field_key, old_value, new_value, user_id, created_at, request_context
+			 FROM " . self::table_name() . '
+			 WHERE batch_id = %s
+			 ORDER BY id ASC',
+			$batch_id
+		);
+
+		$rows = $wpdb->get_results( $sql, ARRAY_A );
+
+		if ( ! is_array( $rows ) ) {
+			return array();
+		}
+
+		return array_map(
+			function ( array $row ): array {
+				$row['id']         = absint( $row['id'] ?? 0 );
+				$row['entity_id']  = absint( $row['entity_id'] ?? 0 );
+				$row['parent_id']  = absint( $row['parent_id'] ?? 0 );
+				$row['user_id']    = absint( $row['user_id'] ?? 0 );
+				$row['old_value']  = $this->deserialize_value( $row['old_value'] ?? '' );
+				$row['new_value']  = $this->deserialize_value( $row['new_value'] ?? '' );
+				$row['created_at'] = isset( $row['created_at'] ) ? (string) $row['created_at'] : '';
+
+				$context = array();
+
+				if ( ! empty( $row['request_context'] ) && is_string( $row['request_context'] ) ) {
+					$decoded = json_decode( $row['request_context'], true );
+
+					if ( JSON_ERROR_NONE === json_last_error() && is_array( $decoded ) ) {
+						$context = $decoded;
+					}
+				}
+
+				$row['request_context'] = $context;
+				$user                   = $row['user_id'] > 0 ? get_userdata( $row['user_id'] ) : false;
+				$row['actor_name']      = $user && isset( $user->display_name ) ? (string) $user->display_name : '';
+				$row['entity_label']    = $this->resolve_entity_label( (string) ( $row['row_type'] ?? '' ), $row['entity_id'] );
 
 				return $row;
 			},
@@ -388,5 +458,26 @@ class PAT_Save_History_Store {
 		}
 
 		return $decoded;
+	}
+
+	/**
+	 * Resolve a human-readable entity label for history rows.
+	 */
+	private function resolve_entity_label( string $row_type, int $entity_id ): string {
+		if ( $entity_id <= 0 ) {
+			return '';
+		}
+
+		if ( function_exists( 'wc_get_product' ) ) {
+			$product = wc_get_product( $entity_id );
+
+			if ( $product && is_object( $product ) && method_exists( $product, 'get_name' ) ) {
+				return (string) $product->get_name();
+			}
+		}
+
+		$title = get_the_title( $entity_id );
+
+		return is_string( $title ) ? $title : '';
 	}
 }

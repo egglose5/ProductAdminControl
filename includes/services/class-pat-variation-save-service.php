@@ -459,7 +459,11 @@ class PAT_Variation_Save_Service {
 				return true;
 
 			case 'package_type':
-				update_post_meta( $variation->get_id(), '_pat_package_type', sanitize_text_field( (string) $value ) );
+				if ( method_exists( $variation, 'update_meta_data' ) ) {
+					$variation->update_meta_data( '_pat_package_type', sanitize_text_field( (string) $value ) );
+				} else {
+					update_post_meta( $variation->get_id(), '_pat_package_type', sanitize_text_field( (string) $value ) );
+				}
 				return true;
 
 			case 'menu_order':
