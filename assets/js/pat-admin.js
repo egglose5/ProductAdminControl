@@ -7,7 +7,9 @@
 	var selectionState = {
 		selectedKeys: Object.create(null),
 		anchorKey: '',
-		focusKey: ''
+		focusKey: '',
+		variationsOnly: false,
+		bulkEditExcludeParents: false
 	};
 
 	function createVariationState() {
@@ -234,6 +236,22 @@
 		return row.getAttribute('data-pat-row-type') || (row.classList.contains('pat-child-row') ? 'variation' : 'product');
 	}
 
+	function isParentRow(row) {
+		if (!row) {
+			return false;
+		}
+
+		return getRowType(row) === 'product' && row.classList.contains('pat-parent-row');
+	}
+
+	function isVariationRow(row) {
+		if (!row) {
+			return false;
+		}
+
+		return getRowType(row) === 'variation' && row.classList.contains('pat-child-row');
+	}
+
 	function getRowSelectionKey(row) {
 		if (!row) {
 			return '';
@@ -276,7 +294,15 @@
 		var rows = root.querySelectorAll(ROW_SELECTOR);
 
 		return Array.prototype.filter.call(rows, function (row) {
-			return isRowVisible(row);
+			if (!isRowVisible(row)) {
+				return false;
+			}
+
+			if (selectionState.variationsOnly && isParentRow(row)) {
+				return false;
+			}
+
+			return true;
 		});
 	}
 
@@ -340,6 +366,46 @@
 		selectionState.selectedKeys = Object.create(null);
 		selectionState.anchorKey = '';
 		selectionState.focusKey = '';
+	}
+
+	function deselectParents(root) {
+		var selectedParents = root.querySelectorAll(ROW_SELECTOR + '.is-selected[data-pat-row-type="product"]');
+
+		Array.prototype.forEach.call(selectedParents, function (row) {
+			setRowSelected(row, false);
+		});
+
+		updateSelectedCount(root);
+	}
+
+	function toggleVariationsOnly(root) {
+		selectionState.variationsOnly = !selectionState.variationsOnly;
+
+		var button = root.querySelector('[data-pat-variations-only-toggle]');
+
+		if (button) {
+			button.classList.toggle('is-active', selectionState.variationsOnly);
+		}
+
+		var filterCheckbox = root.querySelector('[data-pat-variations-only-filter]');
+
+		if (filterCheckbox) {
+			filterCheckbox.checked = selectionState.variationsOnly;
+		}
+
+		if (selectionState.variationsOnly) {
+			deselectParents(root);
+		}
+
+		syncSelectionUI(root);
+	}
+
+	function getRowsByType(root, rowType) {
+		var rows = root.querySelectorAll(ROW_SELECTOR);
+
+		return Array.prototype.filter.call(rows, function (row) {
+			return isRowVisible(row) && getRowType(row) === rowType;
+		});
 	}
 
 	function updateSelectedCount(root) {
@@ -1118,9 +1184,19 @@
 		}
 
 		var countLabel = bar.querySelector('[data-pat-bulk-edit-row-count]');
+		var excludeCheckbox = bar.querySelector('[data-pat-bulk-exclude-parents]');
+		var displayCount = count;
+
+		if (excludeCheckbox && excludeCheckbox.checked) {
+			var variationCount = Array.prototype.filter.call(selectedRows, function (row) {
+				return isVariationRow(row);
+			}).length;
+
+			displayCount = variationCount;
+		}
 
 		if (countLabel) {
-			countLabel.textContent = count + (1 === count ? ' row' : ' rows');
+			countLabel.textContent = displayCount + (1 === displayCount ? ' row' : ' rows');
 		}
 	}
 
@@ -1189,10 +1265,15 @@
 			value = textInput ? textInput.value : '';
 		}
 
+		var excludeParents = bar.querySelector('[data-pat-bulk-exclude-parents]') ? bar.querySelector('[data-pat-bulk-exclude-parents]').checked : false;
 		var selectedRows = root.querySelectorAll(ROW_SELECTOR + '.is-selected');
 
 		Array.prototype.forEach.call(selectedRows, function (row) {
 			if (row.hidden || row.classList.contains('is-hidden')) {
+				return;
+			}
+
+			if (excludeParents && isParentRow(row)) {
 				return;
 			}
 
@@ -1218,8 +1299,17 @@
 
 	function applyFillDown(root) {
 		var selectedRows = root.querySelectorAll(ROW_SELECTOR + '.is-selected');
+		var excludeParents = root.querySelector('[data-pat-bulk-edit-bar] [data-pat-bulk-exclude-parents]') ? root.querySelector('[data-pat-bulk-edit-bar] [data-pat-bulk-exclude-parents]').checked : false;
 		var visibleRows = Array.prototype.filter.call(selectedRows, function (row) {
-			return !row.hidden && !row.classList.contains('is-hidden');
+			if (!row.hidden && !row.classList.contains('is-hidden')) {
+				if (excludeParents && isParentRow(row)) {
+					return false;
+				}
+
+				return true;
+			}
+
+			return false;
 		});
 
 		if (visibleRows.length < 2) {
@@ -1344,6 +1434,35 @@
 				if (textInput) {
 					textInput.style.display = 'none';
 				}
+			}
+		});
+
+		root.addEventListener('change', function (event) {
+			var excludeCheckbox = event.target.closest('[data-pat-bulk-exclude-parents]');
+
+			if (excludeCheckbox && root.contains(excludeCheckbox)) {
+				selectionState.bulkEditExcludeParents = excludeCheckbox.checked;
+				updateBulkEditBar(root);
+				return;
+			}
+		});
+
+		root.addEventListener('change', function (event) {
+			var filterCheckbox = event.target.closest('[data-pat-variations-only-filter]');
+
+			if (filterCheckbox && root.contains(filterCheckbox)) {
+				toggleVariationsOnly(root);
+				return;
+			}
+		});
+
+		root.addEventListener('click', function (event) {
+			var toggleButton = event.target.closest('[data-pat-variations-only-toggle]');
+
+			if (toggleButton && root.contains(toggleButton)) {
+				event.preventDefault();
+				toggleVariationsOnly(root);
+				return;
 			}
 		});
 	}

@@ -69,6 +69,16 @@ $next_url     = $has_next ? $filters->get_page_url( $page + 1, $current_page_slu
 		</select>
 
 		<button type="submit" class="button button-primary"><?php esc_html_e( 'Apply Filters', 'product-admin-tool' ); ?></button>
+
+		<label style="margin-left: 20px; font-weight: normal; display: flex; align-items: center;">
+			<input
+				type="checkbox"
+				name="variations_only"
+				data-pat-variations-only-filter="true"
+				style="margin-right: 6px;"
+			/>
+			<?php esc_html_e( 'Show variations only', 'product-admin-tool' ); ?>
+		</label>
 	</div>
 	<?php if ( '' !== $category_value ) : ?>
 		<p class="description">

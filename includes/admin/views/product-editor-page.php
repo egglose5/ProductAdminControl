@@ -33,6 +33,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 		<button type="button" class="button" data-pat-bulk-edit-trigger="true" disabled="disabled"><?php esc_html_e( 'Bulk Edit', 'product-admin-tool' ); ?></button>
 		<button type="button" class="button" data-pat-fill-down-trigger="true" disabled="disabled"><?php esc_html_e( 'Fill Down', 'product-admin-tool' ); ?></button>
 		<button type="button" class="button" data-pat-generate-variations-trigger="true" disabled="disabled"><?php esc_html_e( 'Generate Variations', 'product-admin-tool' ); ?></button>
+		<button type="button" class="button" data-pat-variations-only-toggle="true" title="<?php esc_attr_e( 'Toggle to show/work with variations only', 'product-admin-tool' ); ?>"><?php esc_html_e( 'Variations only', 'product-admin-tool' ); ?></button>
 		<span class="description"><?php esc_html_e( 'Select rows to use Bulk Edit or Fill Down. Generate Variations is ready to use.', 'product-admin-tool' ); ?></span>
 	</div>
 
@@ -60,6 +61,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 			<option value="private"><?php esc_html_e( 'Private', 'product-admin-tool' ); ?></option>
 		</select>
 		<input type="text" class="regular-text pat-bulk-edit-value-text" data-pat-bulk-value-text style="display:none" placeholder="<?php esc_attr_e( 'Value...', 'product-admin-tool' ); ?>" aria-label="<?php esc_attr_e( 'Bulk edit value', 'product-admin-tool' ); ?>" />
+		<label style="margin-left: 15px; font-weight: normal; display: flex; align-items: center;">
+			<input
+				type="checkbox"
+				data-pat-bulk-exclude-parents="true"
+				style="margin-right: 6px;"
+				aria-label="<?php esc_attr_e( 'Exclude parent rows from operation', 'product-admin-tool' ); ?>"
+			/>
+			<?php esc_html_e( 'Exclude parents', 'product-admin-tool' ); ?>
+		</label>
 		<button type="button" class="button button-primary" data-pat-bulk-apply="true"><?php esc_html_e( 'Apply to selection', 'product-admin-tool' ); ?></button>
 		<button type="button" class="button" data-pat-bulk-cancel="true"><?php esc_html_e( 'Cancel', 'product-admin-tool' ); ?></button>
 	</div>
