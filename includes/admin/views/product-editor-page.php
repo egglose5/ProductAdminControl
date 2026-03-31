@@ -26,7 +26,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	</div>
 
 	<?php if ( $filters instanceof PAT_Product_Filters ) : ?>
-		<?php $filters->render( array( 'pagination' => $pagination, 'current_page_slug' => $current_page_slug ) ); ?>
+		<?php $filters->render( array( 'pagination' => $pagination, 'current_page_slug' => $current_page_slug, 'applied_filters' => isset( $grid_data['filters'] ) && is_array( $grid_data['filters'] ) ? $grid_data['filters'] : array() ) ); ?>
 	<?php endif; ?>
 
 	<div class="pat-toolbar pat-action-bar">

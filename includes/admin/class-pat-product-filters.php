@@ -20,6 +20,7 @@ class PAT_Product_Filters {
 
 		$pagination = isset( $args['pagination'] ) && is_array( $args['pagination'] ) ? $args['pagination'] : array();
 		$current_page_slug = isset( $args['current_page_slug'] ) ? (string) $args['current_page_slug'] : '';
+		$applied_filters = isset( $args['applied_filters'] ) && is_array( $args['applied_filters'] ) ? $args['applied_filters'] : array();
 
 		include $template;
 	}

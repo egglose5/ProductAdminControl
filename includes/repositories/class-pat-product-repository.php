@@ -31,17 +31,26 @@ class PAT_Product_Repository {
 					'total_items' => 0,
 					'total_pages' => 0,
 				),
-				'filters'    => array(
-					'search' => isset( $args['search'] ) ? sanitize_text_field( wp_unslash( $args['search'] ) ) : '',
-					'status' => $this->normalize_status_filter( $args['status'] ?? '' ),
-					'category' => isset( $args['category'] ) ? sanitize_title( wp_unslash( (string) $args['category'] ) ) : '',
-				),
+				'filters'    => $this->build_filters_payload( $this->normalize_query_args( $args ) ),
 			);
 		}
 
 		$query_args = $this->normalize_query_args( $args );
 		$rows       = array();
 		$query      = null;
+
+		if ( '' !== $query_args['category'] && empty( $query_args['category_scope']['ids'] ) ) {
+			return array(
+				'rows'       => array(),
+				'pagination' => array(
+					'page'        => $query_args['page'],
+					'per_page'    => $query_args['per_page'],
+					'total_items' => 0,
+					'total_pages' => 0,
+				),
+				'filters'    => $this->build_filters_payload( $query_args ),
+			);
+		}
 
 		if ( '' === $query_args['search'] ) {
 			$query = new WP_Query( $this->build_query_args( $query_args ) );
@@ -57,11 +66,7 @@ class PAT_Product_Repository {
 						'total_items' => 0,
 						'total_pages' => 0,
 					),
-					'filters'    => array(
-						'search' => $query_args['search'],
-						'status' => $query_args['status'],
-						'category' => $query_args['category'],
-					),
+					'filters'    => $this->build_filters_payload( $query_args ),
 				);
 			}
 
@@ -96,11 +101,7 @@ class PAT_Product_Repository {
 				'total_items' => $query instanceof WP_Query ? (int) $query->found_posts : 0,
 				'total_pages' => $query instanceof WP_Query ? (int) $query->max_num_pages : 0,
 			),
-			'filters'    => array(
-				'search' => $query_args['search'],
-				'status' => $query_args['status'],
-				'category' => $query_args['category'],
-			),
+			'filters'    => $this->build_filters_payload( $query_args ),
 		);
 	}
 
@@ -116,6 +117,7 @@ class PAT_Product_Repository {
 		$search   = isset( $args['search'] ) ? sanitize_text_field( wp_unslash( $args['search'] ) ) : '';
 		$status   = $this->normalize_status_filter( $args['status'] ?? '' );
 		$category = isset( $args['category'] ) ? sanitize_title( wp_unslash( (string) $args['category'] ) ) : '';
+		$category_scope = $this->resolve_category_scope( $category );
 
 		return array(
 			'page'     => $page,
@@ -123,6 +125,7 @@ class PAT_Product_Repository {
 			'search'   => $search,
 			'status'   => $status,
 			'category' => $category,
+			'category_scope' => $category_scope,
 		);
 	}
 
@@ -154,11 +157,17 @@ class PAT_Product_Repository {
 		}
 
 		if ( '' !== $args['category'] ) {
+			$category_ids = isset( $args['category_scope']['ids'] ) && is_array( $args['category_scope']['ids'] )
+				? array_values( array_filter( array_map( 'absint', $args['category_scope']['ids'] ) ) )
+				: array();
+
 			$query_args['tax_query'] = array(
 				array(
-					'taxonomy' => 'product_cat',
-					'field'    => 'slug',
-					'terms'    => $args['category'],
+					'taxonomy'         => 'product_cat',
+					'field'            => 'term_id',
+					'terms'            => $category_ids,
+					'operator'         => 'IN',
+					'include_children' => false,
 				),
 			);
 		}
@@ -380,5 +389,186 @@ class PAT_Product_Repository {
 		}
 
 		return $status;
+	}
+
+	/**
+	 * Build normalized filters payload for grid consumers.
+	 *
+	 * @param array $query_args Normalized query args.
+	 * @return array<string, mixed>
+	 */
+	private function build_filters_payload( array $query_args ): array {
+		$category_scope = isset( $query_args['category_scope'] ) && is_array( $query_args['category_scope'] )
+			? $query_args['category_scope']
+			: array();
+
+		return array(
+			'search'   => isset( $query_args['search'] ) ? (string) $query_args['search'] : '',
+			'status'   => isset( $query_args['status'] ) ? $query_args['status'] : '',
+			'category' => isset( $query_args['category'] ) ? (string) $query_args['category'] : '',
+			'category_scope' => array(
+				'selected_term_id' => isset( $category_scope['selected_term_id'] ) ? absint( $category_scope['selected_term_id'] ) : 0,
+				'selected_name'    => isset( $category_scope['selected_name'] ) ? (string) $category_scope['selected_name'] : '',
+				'descendant_count' => isset( $category_scope['descendant_count'] ) ? max( 0, absint( $category_scope['descendant_count'] ) ) : 0,
+				'total_term_count' => isset( $category_scope['total_term_count'] ) ? max( 0, absint( $category_scope['total_term_count'] ) ) : 0,
+				'parent_product_count' => isset( $category_scope['parent_product_count'] ) ? max( 0, absint( $category_scope['parent_product_count'] ) ) : 0,
+				'variation_row_count'  => isset( $category_scope['variation_row_count'] ) ? max( 0, absint( $category_scope['variation_row_count'] ) ) : 0,
+			),
+		);
+	}
+
+	/**
+	 * Resolve selected category into a term scope including descendants.
+	 *
+	 * @param string $category_slug Selected category slug.
+	 * @return array<string, mixed>
+	 */
+	private function resolve_category_scope( string $category_slug ): array {
+		$scope = array(
+			'ids'             => array(),
+			'selected_term_id' => 0,
+			'selected_name'   => '',
+			'descendant_count' => 0,
+			'total_term_count' => 0,
+			'parent_product_count' => 0,
+			'variation_row_count'  => 0,
+		);
+
+		if ( '' === $category_slug || ! taxonomy_exists( 'product_cat' ) ) {
+			return $scope;
+		}
+
+		$term = get_term_by( 'slug', $category_slug, 'product_cat' );
+
+		if ( ! $term instanceof WP_Term ) {
+			return $scope;
+		}
+
+		$term_ids      = array( (int) $term->term_id );
+		$descendants   = get_term_children( (int) $term->term_id, 'product_cat' );
+
+		if ( ! is_wp_error( $descendants ) && ! empty( $descendants ) ) {
+			$term_ids = array_merge( $term_ids, array_map( 'intval', $descendants ) );
+		}
+
+		$term_ids = array_values( array_unique( array_filter( array_map( 'absint', $term_ids ) ) ) );
+
+		$scope['ids']              = $term_ids;
+		$scope['selected_term_id'] = (int) $term->term_id;
+		$scope['selected_name']    = (string) $term->name;
+		$scope['total_term_count'] = count( $term_ids );
+		$scope['descendant_count'] = max( 0, $scope['total_term_count'] - 1 );
+
+		$scope_counts = $this->count_category_scope_rows( $term_ids );
+		$scope['parent_product_count'] = $scope_counts['parent_product_count'];
+		$scope['variation_row_count']  = $scope_counts['variation_row_count'];
+
+		return $scope;
+	}
+
+	/**
+	 * Count parent product and variation rows for a category scope.
+	 *
+	 * @param array<int> $term_ids Scoped product category term IDs.
+	 * @return array<string, int>
+	 */
+	private function count_category_scope_rows( array $term_ids ): array {
+		$term_ids = array_values( array_filter( array_map( 'absint', $term_ids ) ) );
+
+		if ( empty( $term_ids ) ) {
+			return array(
+				'parent_product_count' => 0,
+				'variation_row_count'  => 0,
+			);
+		}
+
+		$parent_count_query = new WP_Query(
+			array(
+				'post_type'              => 'product',
+				'post_parent'            => 0,
+				'post_status'            => array( 'publish', 'draft', 'pending', 'private' ),
+				'posts_per_page'         => 1,
+				'orderby'                => 'ID',
+				'order'                  => 'ASC',
+				'ignore_sticky_posts'    => true,
+				'no_found_rows'          => false,
+				'fields'                 => 'ids',
+				'update_post_meta_cache' => false,
+				'update_post_term_cache' => false,
+				'tax_query'              => array(
+					array(
+						'taxonomy'         => 'product_cat',
+						'field'            => 'term_id',
+						'terms'            => $term_ids,
+						'operator'         => 'IN',
+						'include_children' => false,
+					),
+				),
+			)
+		);
+
+		$parent_product_count = (int) $parent_count_query->found_posts;
+
+		if ( $parent_product_count <= 0 ) {
+			return array(
+				'parent_product_count' => 0,
+				'variation_row_count'  => 0,
+			);
+		}
+
+		$parent_ids_query = new WP_Query(
+			array(
+				'post_type'              => 'product',
+				'post_parent'            => 0,
+				'post_status'            => array( 'publish', 'draft', 'pending', 'private' ),
+				'posts_per_page'         => -1,
+				'orderby'                => 'ID',
+				'order'                  => 'ASC',
+				'ignore_sticky_posts'    => true,
+				'no_found_rows'          => true,
+				'fields'                 => 'ids',
+				'update_post_meta_cache' => false,
+				'update_post_term_cache' => false,
+				'tax_query'              => array(
+					array(
+						'taxonomy'         => 'product_cat',
+						'field'            => 'term_id',
+						'terms'            => $term_ids,
+						'operator'         => 'IN',
+						'include_children' => false,
+					),
+				),
+			)
+		);
+
+		$parent_ids = array_values( array_filter( array_map( 'absint', (array) $parent_ids_query->posts ) ) );
+		$variation_row_count = 0;
+
+		if ( ! empty( $parent_ids ) ) {
+			foreach ( array_chunk( $parent_ids, 200 ) as $parent_chunk ) {
+				$variation_count_query = new WP_Query(
+					array(
+						'post_type'              => 'product_variation',
+						'post_status'            => array( 'publish', 'private', 'draft', 'pending' ),
+						'posts_per_page'         => 1,
+						'orderby'                => 'ID',
+						'order'                  => 'ASC',
+						'ignore_sticky_posts'    => true,
+						'no_found_rows'          => false,
+						'fields'                 => 'ids',
+						'update_post_meta_cache' => false,
+						'update_post_term_cache' => false,
+						'post_parent__in'        => $parent_chunk,
+					)
+				);
+
+				$variation_row_count += (int) $variation_count_query->found_posts;
+			}
+		}
+
+		return array(
+			'parent_product_count' => max( 0, $parent_product_count ),
+			'variation_row_count'  => max( 0, $variation_row_count ),
+		);
 	}
 }
