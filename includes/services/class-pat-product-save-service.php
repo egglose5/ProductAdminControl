@@ -22,6 +22,7 @@ class PAT_Product_Save_Service {
 		'width',
 		'height',
 		'shipping_class_id',
+		'package_type',
 		'menu_order',
 	);
 
@@ -235,6 +236,12 @@ class PAT_Product_Save_Service {
 					}
 					break;
 
+				case 'package_type':
+					if ( method_exists( $product, 'get_id' ) ) {
+						update_post_meta( $product->get_id(), '_pat_package_type', sanitize_text_field( (string) $value ) );
+					}
+					break;
+
 				case 'menu_order':
 					if ( method_exists( $product, 'set_menu_order' ) ) {
 						$product->set_menu_order( (int) $value );
@@ -354,6 +361,10 @@ class PAT_Product_Save_Service {
 					}
 
 					$value = $integer;
+					break;
+
+				case 'package_type':
+					$value = sanitize_text_field( (string) $value );
 					break;
 
 				case 'menu_order':
@@ -497,8 +508,11 @@ class PAT_Product_Save_Service {
 	 * @return array<string, mixed>
 	 */
 	private function normalize_product_data( $product ): array {
+		$product_id = method_exists( $product, 'get_id' ) ? (int) $product->get_id() : 0;
+		$package_type = $product_id > 0 ? (string) get_post_meta( $product_id, '_pat_package_type', true ) : '';
+
 		return array(
-			'id'             => method_exists( $product, 'get_id' ) ? (int) $product->get_id() : 0,
+			'id'             => $product_id,
 			'row_type'       => self::ROW_TYPE,
 			'title'          => method_exists( $product, 'get_name' ) ? (string) $product->get_name() : '',
 			'sku'            => method_exists( $product, 'get_sku' ) ? (string) $product->get_sku() : '',
@@ -511,6 +525,7 @@ class PAT_Product_Save_Service {
 			'width'          => method_exists( $product, 'get_width' ) ? (string) $product->get_width() : '',
 			'height'         => method_exists( $product, 'get_height' ) ? (string) $product->get_height() : '',
 			'shipping_class_id' => method_exists( $product, 'get_shipping_class_id' ) ? (int) $product->get_shipping_class_id() : 0,
+			'package_type'   => $package_type,
 			'menu_order'     => method_exists( $product, 'get_menu_order' ) ? (int) $product->get_menu_order() : 0,
 		);
 	}

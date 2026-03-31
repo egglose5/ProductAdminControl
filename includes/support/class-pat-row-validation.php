@@ -18,10 +18,10 @@ class PAT_Row_Validation {
 		$row_type = self::sanitize_row_type( $row_type );
 
 		if ( self::ROW_TYPE_VARIATION === $row_type ) {
-			return array( 'sku', 'status', 'regular_price', 'sale_price', 'stock_quantity', 'menu_order' );
+			return array( 'sku', 'status', 'regular_price', 'sale_price', 'stock_quantity', 'package_type', 'menu_order' );
 		}
 
-		return array( 'title', 'sku', 'status', 'regular_price', 'sale_price', 'stock_quantity', 'weight', 'length', 'width', 'height', 'shipping_class_id', 'menu_order' );
+		return array( 'title', 'sku', 'status', 'regular_price', 'sale_price', 'stock_quantity', 'weight', 'length', 'width', 'height', 'shipping_class_id', 'package_type', 'menu_order' );
 	}
 
 	/**
@@ -176,6 +176,10 @@ class PAT_Row_Validation {
 				}
 
 				return array( 'value' => $value );
+
+			case 'package_type':
+				$value = sanitize_text_field( (string) $value );
+				return array( 'value' => trim( $value ) );
 
 			case 'menu_order':
 				$value = is_scalar( $value ) ? (int) $value : null;

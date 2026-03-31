@@ -326,6 +326,7 @@ class PAT_Product_Repository {
 	 */
 	private function normalize_product_row( WC_Product $product ): array {
 		$term_names = wp_get_post_terms( $product->get_id(), 'product_cat', array( 'fields' => 'names' ) );
+		$package_type = (string) get_post_meta( $product->get_id(), '_pat_package_type', true );
 
 		if ( is_wp_error( $term_names ) ) {
 			$term_names = array();
@@ -348,6 +349,7 @@ class PAT_Product_Repository {
 			'width'          => method_exists( $product, 'get_width' ) ? (string) $product->get_width() : '',
 			'height'         => method_exists( $product, 'get_height' ) ? (string) $product->get_height() : '',
 			'shipping_class_id' => method_exists( $product, 'get_shipping_class_id' ) ? (int) $product->get_shipping_class_id() : 0,
+			'package_type'   => $package_type,
 			'menu_order'     => (int) $product->get_menu_order(),
 			'categories'     => array_values( array_filter( array_map( 'strval', (array) $term_names ) ) ),
 			'has_children'   => $product->is_type( 'variable' ),

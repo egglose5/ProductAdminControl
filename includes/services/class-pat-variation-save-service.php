@@ -348,6 +348,7 @@ class PAT_Variation_Save_Service {
 			'regular_price',
 			'sale_price',
 			'stock_quantity',
+			'package_type',
 			'menu_order',
 		);
 
@@ -411,6 +412,10 @@ class PAT_Variation_Save_Service {
 				$variation->set_stock_quantity( absint( $value ) );
 				return true;
 
+			case 'package_type':
+				update_post_meta( $variation->get_id(), '_pat_package_type', sanitize_text_field( (string) $value ) );
+				return true;
+
 			case 'menu_order':
 				$variation->set_menu_order( (int) $value );
 				return true;
@@ -440,6 +445,9 @@ class PAT_Variation_Save_Service {
 
 			case 'stock_quantity':
 				return '' === $value ? '' : absint( $value );
+
+			case 'package_type':
+				return sanitize_text_field( (string) $value );
 
 			case 'menu_order':
 				return (int) $value;
@@ -501,8 +509,11 @@ class PAT_Variation_Save_Service {
 	 * @return array<string, mixed>
 	 */
 	private function normalize_saved_variation( WC_Product_Variation $variation ): array {
+		$variation_id = $variation->get_id();
+		$package_type = (string) get_post_meta( $variation_id, '_pat_package_type', true );
+
 		return array(
-			'id'               => $variation->get_id(),
+			'id'               => $variation_id,
 			'parent_id'        => $variation->get_parent_id(),
 			'row_type'         => self::ROW_TYPE,
 			'sku'              => (string) $variation->get_sku(),
@@ -510,6 +521,7 @@ class PAT_Variation_Save_Service {
 			'regular_price'    => (string) $variation->get_regular_price(),
 			'sale_price'       => (string) $variation->get_sale_price(),
 			'stock_quantity'   => $variation->get_stock_quantity(),
+			'package_type'     => $package_type,
 			'menu_order'       => (int) $variation->get_menu_order(),
 			'attribute_summary' => $this->build_attribute_summary( $variation ),
 		);

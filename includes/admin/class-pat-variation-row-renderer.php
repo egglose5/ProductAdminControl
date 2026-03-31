@@ -128,6 +128,7 @@ class PAT_Variation_Row_Renderer {
 				'price'             => isset( $variation_row['price'] ) ? (string) $variation_row['price'] : '',
 				'regular_price'     => isset( $variation_row['regular_price'] ) ? (string) $variation_row['regular_price'] : ( isset( $variation_row['price'] ) ? (string) $variation_row['price'] : '' ),
 				'sale_price'        => isset( $variation_row['sale_price'] ) ? (string) $variation_row['sale_price'] : '',
+				'package_type'      => isset( $variation_row['package_type'] ) ? (string) $variation_row['package_type'] : '',
 				'stock'             => isset( $variation_row['stock'] ) ? (string) $variation_row['stock'] : '',
 				'stock_quantity'    => isset( $variation_row['stock_quantity'] ) ? (string) $variation_row['stock_quantity'] : ( isset( $variation_row['stock'] ) ? (string) $variation_row['stock'] : '' ),
 				'status'            => isset( $variation_row['status'] ) ? (string) $variation_row['status'] : '',

@@ -75,6 +75,7 @@ class PAT_Variation_Repository {
 		$regular_price = '';
 		$sale_price = '';
 		$stock     = '';
+		$package_type = (string) get_post_meta( $post->ID, '_pat_package_type', true );
 		$menu_order = (int) $post->menu_order;
 		$status    = $post->post_status;
 		$summary   = $this->build_attribute_summary( $post, $product );
@@ -129,6 +130,7 @@ class PAT_Variation_Repository {
 			'price'            => $price,
 			'regular_price'    => $regular_price,
 			'sale_price'       => $sale_price,
+			'package_type'     => $package_type,
 			'menu_order'       => $menu_order,
 			'attribute_summary' => $summary,
 		);

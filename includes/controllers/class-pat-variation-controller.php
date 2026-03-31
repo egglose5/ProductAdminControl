@@ -258,6 +258,7 @@ class PAT_Variation_Controller {
 			'price'            => $price,
 			'regular_price'    => $regular_price,
 			'sale_price'       => $sale_price,
+			'package_type'     => isset( $row['package_type'] ) ? (string) $row['package_type'] : '',
 			'stock'            => $stock,
 			'stock_quantity'   => $stock,
 			'status'           => $status,

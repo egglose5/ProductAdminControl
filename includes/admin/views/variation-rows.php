@@ -26,6 +26,7 @@ $status_options = array(
 		$child_status       = isset( $child['status'] ) ? (string) $child['status'] : 'draft';
 		$child_regular_price = isset( $child['regular_price'] ) ? (string) $child['regular_price'] : ( isset( $child['price'] ) ? (string) $child['price'] : '' );
 		$child_sale_price   = isset( $child['sale_price'] ) ? (string) $child['sale_price'] : '';
+		$child_package_type = isset( $child['package_type'] ) ? (string) $child['package_type'] : '';
 		$child_sku          = isset( $child['sku'] ) ? (string) $child['sku'] : '';
 		$child_menu_order   = isset( $child['menu_order'] ) ? (string) $child['menu_order'] : '0';
 		$child_attributes   = isset( $child['attributes'] ) && is_array( $child['attributes'] ) ? wp_json_encode( $child['attributes'] ) : '{}';
@@ -47,7 +48,22 @@ $status_options = array(
 					<?php endif; ?>
 				</div>
 			</td>
-			<td>-</td>
+			<td>
+				<div class="pat-inline-field-group">
+					<label class="screen-reader-text" for="<?php echo esc_attr( 'pat-variation-package-type-' . $child_row_id ); ?>"><?php esc_html_e( 'Variation package type', 'product-admin-tool' ); ?></label>
+					<input
+						id="<?php echo esc_attr( 'pat-variation-package-type-' . $child_row_id ); ?>"
+						class="pat-inline-field"
+						type="text"
+						value="<?php echo esc_attr( $child_package_type ); ?>"
+						data-pat-row-id="<?php echo esc_attr( $child_row_id ); ?>"
+						data-pat-row-type="variation"
+						data-pat-field="package_type"
+						data-pat-original-value="<?php echo esc_attr( $child_package_type ); ?>"
+					/>
+					<span class="pat-inline-label"><?php esc_html_e( 'Package', 'product-admin-tool' ); ?></span>
+				</div>
+			</td>
 			<td><?php esc_html_e( 'variation', 'product-admin-tool' ); ?></td>
 			<td>
 				<label class="screen-reader-text" for="<?php echo esc_attr( 'pat-variation-sku-' . $child_row_id ); ?>"><?php esc_html_e( 'Variation SKU', 'product-admin-tool' ); ?></label>

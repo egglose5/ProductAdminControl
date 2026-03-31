@@ -70,6 +70,7 @@ if ( taxonomy_exists( 'product_shipping_class' ) ) {
 					$width_value         = isset( $row['width'] ) ? (string) $row['width'] : '';
 					$height_value        = isset( $row['height'] ) ? (string) $row['height'] : '';
 					$shipping_class_id_value = isset( $row['shipping_class_id'] ) ? (string) absint( $row['shipping_class_id'] ) : '0';
+					$package_type_value  = isset( $row['package_type'] ) ? (string) $row['package_type'] : '';
 					$menu_order_value    = isset( $row['menu_order'] ) ? (string) $row['menu_order'] : '0';
 					$row_state_label     = '';
 
@@ -274,6 +275,20 @@ if ( taxonomy_exists( 'product_shipping_class' ) ) {
 									data-pat-original-value="<?php echo esc_attr( $height_value ); ?>"
 								/>
 								<span class="pat-inline-label"><?php esc_html_e( 'H', 'product-admin-tool' ); ?></span>
+							</div>
+							<div class="pat-inline-field-group">
+								<label class="screen-reader-text" for="<?php echo esc_attr( 'pat-package-type-' . $row_id ); ?>"><?php esc_html_e( 'Package type', 'product-admin-tool' ); ?></label>
+								<input
+									id="<?php echo esc_attr( 'pat-package-type-' . $row_id ); ?>"
+									class="pat-inline-field"
+									type="text"
+									value="<?php echo esc_attr( $package_type_value ); ?>"
+									data-pat-row-id="<?php echo esc_attr( $row_id ); ?>"
+									data-pat-row-type="product"
+									data-pat-field="package_type"
+									data-pat-original-value="<?php echo esc_attr( $package_type_value ); ?>"
+								/>
+								<span class="pat-inline-label"><?php esc_html_e( 'Package', 'product-admin-tool' ); ?></span>
 							</div>
 							<div class="pat-inline-field-group">
 								<label class="screen-reader-text" for="<?php echo esc_attr( 'pat-shipping-class-' . $row_id ); ?>"><?php esc_html_e( 'Shipping class', 'product-admin-tool' ); ?></label>

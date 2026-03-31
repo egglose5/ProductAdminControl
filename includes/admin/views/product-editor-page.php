@@ -50,6 +50,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 			<option value="length"><?php esc_html_e( 'Length', 'product-admin-tool' ); ?></option>
 			<option value="width"><?php esc_html_e( 'Width', 'product-admin-tool' ); ?></option>
 			<option value="height"><?php esc_html_e( 'Height', 'product-admin-tool' ); ?></option>
+			<option value="package_type"><?php esc_html_e( 'Package Type', 'product-admin-tool' ); ?></option>
 			<option value="menu_order"><?php esc_html_e( 'Menu Order', 'product-admin-tool' ); ?></option>
 		</select>
 		<select class="pat-bulk-edit-value-status" data-pat-bulk-value-status style="display:none" aria-label="<?php esc_attr_e( 'Status value', 'product-admin-tool' ); ?>">
