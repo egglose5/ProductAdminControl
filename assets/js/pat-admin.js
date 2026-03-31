@@ -1994,14 +1994,18 @@
 		});
 	}
 
-	function requestSaveHistory() {
+	function requestSaveHistory(batchId) {
 		if (!window.PATAdmin || !window.PATAdmin.ajaxUrl || !window.PATAdmin.historyAction) {
-			return Promise.resolve({ success: false, batches: [] });
+			return Promise.resolve({ success: false, batches: [], entries: [] });
 		}
 
 		var formData = new window.FormData();
 		formData.append('action', window.PATAdmin.historyAction);
 		formData.append(window.PATAdmin.historyNonceField || 'nonce', window.PATAdmin.historyNonce || '');
+
+		if (batchId) {
+			formData.append('batch_id', String(batchId));
+		}
 
 		return window.fetch(window.PATAdmin.ajaxUrl, {
 			method: 'POST',
@@ -2036,6 +2040,22 @@
 		return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 	}
 
+	function formatHistoryValue(value) {
+		if (null === value || 'undefined' === typeof value || '' === value) {
+			return '—';
+		}
+
+		if ('string' === typeof value || 'number' === typeof value || 'boolean' === typeof value) {
+			return String(value);
+		}
+
+		try {
+			return JSON.stringify(value);
+		} catch (error) {
+			return String(value);
+		}
+	}
+
 	function renderHistoryPanel(root, response) {
 		var panel = root.querySelector('[data-pat-history-panel]');
 
@@ -2061,6 +2081,7 @@
 		html += '<thead><tr>';
 		html += '<th>Type</th>';
 		html += '<th>Time</th>';
+		html += '<th>By</th>';
 		html += '<th>Products</th>';
 		html += '<th>Fields</th>';
 		html += '<th></th>';
@@ -2068,9 +2089,10 @@
 
 		batches.forEach(function (batch) {
 			var actionType = batch && batch.action_type ? String(batch.action_type) : 'save';
-			var actionLabel = 'save' === actionType ? 'Save' : 'Undo';
+			var actionLabel = 'save' === actionType ? 'Save' : ('undo' === actionType ? 'Undo' : 'Error');
 			var isUndoable = batch && batch.undoable;
 			var batchId = batch && batch.batch_id ? String(batch.batch_id) : '';
+			var actorName = batch && batch.actor_name ? String(batch.actor_name) : 'Unknown user';
 
 			html += '<tr class="pat-history-entry">';
 			html += '<td><span class="pat-history-action-type pat-history-action-' + escapeHistoryHtml(actionType) + '">' + escapeHistoryHtml(actionLabel) + '</span>';
@@ -2081,9 +2103,11 @@
 
 			html += '</td>';
 			html += '<td class="pat-history-time">' + escapeHistoryHtml(formatHistoryBatchTime(batch && batch.batch_time ? batch.batch_time : '')) + '</td>';
+			html += '<td class="pat-history-actor">' + escapeHistoryHtml(actorName) + '</td>';
 			html += '<td class="pat-history-stat">' + (batch && batch.entity_count ? Number(batch.entity_count) : 0) + '</td>';
 			html += '<td class="pat-history-stat">' + (batch && batch.field_count ? Number(batch.field_count) : 0) + '</td>';
 			html += '<td class="pat-history-actions">';
+			html += '<button type="button" class="button button-small" data-pat-history-details="' + escapeHistoryHtml(batchId) + '">Details</button>';
 
 			if (isUndoable && batchId) {
 				html += '<button type="button" class="button button-small" data-pat-undo-batch-id="' + escapeHistoryHtml(batchId) + '">Undo</button>';
@@ -2095,6 +2119,94 @@
 
 		html += '</tbody></table>';
 		list.innerHTML = html;
+	}
+
+	function renderHistoryDetails(entries) {
+		if (!entries || !entries.length) {
+			return '<p class="pat-history-empty">No field-level entries were stored for this batch.</p>';
+		}
+
+		var html = '<table class="pat-history-detail-table">';
+		html += '<thead><tr>';
+		html += '<th>Row</th>';
+		html += '<th>Field</th>';
+		html += '<th>Before</th>';
+		html += '<th>After</th>';
+		html += '<th>By</th>';
+		html += '<th>Time</th>';
+		html += '</tr></thead><tbody>';
+
+		entries.forEach(function (entry) {
+			var isError = entry && entry.action_type && 'save_error' === String(entry.action_type);
+			var label = entry && entry.entity_label ? String(entry.entity_label) : '';
+			var rowType = entry && entry.row_type ? String(entry.row_type) : '';
+			var rowCell = label ? label : (rowType ? rowType + ' #' + Number(entry && entry.entity_id ? entry.entity_id : 0) : 'Batch event');
+			var fieldCell = isError ? 'Error' : (entry && entry.field_key ? String(entry.field_key) : '—');
+			var beforeValue = isError && entry && entry.request_context && entry.request_context.message
+				? String(entry.request_context.message)
+				: formatHistoryValue(entry ? entry.old_value : '');
+			var afterValue = isError
+				? (entry && entry.request_context && entry.request_context.rolled_back ? 'Rolled back' : 'Not saved')
+				: formatHistoryValue(entry ? entry.new_value : '');
+
+			html += '<tr class="pat-history-detail-entry' + (isError ? ' is-error' : '') + '">';
+			html += '<td>' + escapeHistoryHtml(rowCell) + '</td>';
+			html += '<td>' + escapeHistoryHtml(fieldCell) + '</td>';
+			html += '<td>' + escapeHistoryHtml(beforeValue) + '</td>';
+			html += '<td>' + escapeHistoryHtml(afterValue) + '</td>';
+			html += '<td>' + escapeHistoryHtml(entry && entry.actor_name ? String(entry.actor_name) : 'Unknown user') + '</td>';
+			html += '<td>' + escapeHistoryHtml(formatHistoryBatchTime(entry && entry.created_at ? entry.created_at : '')) + '</td>';
+			html += '</tr>';
+		});
+
+		html += '</tbody></table>';
+		return html;
+	}
+
+	function toggleHistoryDetails(root, button) {
+		var batchId = button && button.getAttribute('data-pat-history-details');
+
+		if (!batchId) {
+			return;
+		}
+
+		var row = button.closest('.pat-history-entry');
+
+		if (!row) {
+			return;
+		}
+
+		var existing = row.nextElementSibling;
+
+		if (existing && existing.classList.contains('pat-history-detail-row')) {
+			existing.parentNode.removeChild(existing);
+			button.textContent = 'Details';
+			return;
+		}
+
+		requestSaveHistory(batchId).then(function (response) {
+			var payload = response && response.data && !Array.isArray(response.entries) ? response.data : response;
+			var entries = payload && Array.isArray(payload.entries) ? payload.entries : [];
+			var detailRow = document.createElement('tr');
+			var detailCell = document.createElement('td');
+
+			detailRow.className = 'pat-history-detail-row';
+			detailCell.colSpan = 6;
+			detailCell.innerHTML = renderHistoryDetails(entries);
+			detailRow.appendChild(detailCell);
+			row.parentNode.insertBefore(detailRow, row.nextSibling);
+			button.textContent = 'Hide';
+		}).catch(function () {
+			var detailRow = document.createElement('tr');
+			var detailCell = document.createElement('td');
+
+			detailRow.className = 'pat-history-detail-row';
+			detailCell.colSpan = 6;
+			detailCell.innerHTML = '<p class="pat-history-error">Could not load batch details.</p>';
+			detailRow.appendChild(detailCell);
+			row.parentNode.insertBefore(detailRow, row.nextSibling);
+			button.textContent = 'Hide';
+		});
 	}
 
 	function isHistoryPanelOpen(root) {
@@ -2178,6 +2290,14 @@
 				event.preventDefault();
 				closeHistoryPanel(root);
 				handleUndoClick(root);
+				return;
+			}
+
+			var detailsBtn = event.target.closest('[data-pat-history-details]');
+
+			if (detailsBtn) {
+				event.preventDefault();
+				toggleHistoryDetails(root, detailsBtn);
 			}
 		});
 	}

@@ -653,3 +653,48 @@
         text-align: right;
         white-space: nowrap;
 }
+
+.pat-admin-shell .pat-history-actions .button,
+.pat-product-editor .pat-history-actions .button {
+        margin-left: 6px;
+}
+
+.pat-admin-shell .pat-history-action-save_error,
+.pat-product-editor .pat-history-action-save_error {
+        color: #b32d2e;
+}
+
+.pat-admin-shell .pat-history-actor,
+.pat-product-editor .pat-history-actor {
+        color: #444;
+        white-space: nowrap;
+}
+
+.pat-admin-shell .pat-history-detail-row td,
+.pat-product-editor .pat-history-detail-row td {
+        padding: 10px 8px 12px;
+        background: #fafafa;
+        border-bottom: 1px solid #ececec;
+}
+
+.pat-admin-shell .pat-history-detail-table,
+.pat-product-editor .pat-history-detail-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+}
+
+.pat-admin-shell .pat-history-detail-table th,
+.pat-product-editor .pat-history-detail-table th,
+.pat-admin-shell .pat-history-detail-table td,
+.pat-product-editor .pat-history-detail-table td {
+        padding: 6px 8px;
+        border: 1px solid #e5e5e5;
+        text-align: left;
+        vertical-align: top;
+}
+
+.pat-admin-shell .pat-history-detail-entry.is-error td,
+.pat-product-editor .pat-history-detail-entry.is-error td {
+        background: #fff6f6;
+}

@@ -45,12 +45,24 @@ class PAT_History_Controller {
 		}
 
 		$store   = new PAT_Save_History_Store();
-		$user_id = get_current_user_id();
-		$limit   = isset( $_POST['limit'] ) ? (int) $_POST['limit'] : 10;
-		$limit   = max( 1, min( 20, $limit ) );
+		$user_id  = get_current_user_id();
+		$limit    = isset( $_POST['limit'] ) ? (int) $_POST['limit'] : 10;
+		$limit    = max( 1, min( 20, $limit ) );
+		$batch_id = isset( $_POST['batch_id'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['batch_id'] ) ) : '';
+
+		if ( '' !== $batch_id ) {
+			wp_send_json(
+				array(
+					'success' => true,
+					'batch_id' => $batch_id,
+					'entries' => $store->get_batch_entries( $batch_id ),
+				),
+				200
+			);
+		}
 
 		$undo_batch_id = $store->peek_undo_batch( $user_id );
-		$raw_batches   = $store->get_recent_batches( $user_id, $limit );
+		$raw_batches   = $store->get_recent_batches( 0, $limit );
 
 		$batches = array_map(
 			static function ( array $batch ) use ( $undo_batch_id ): array {
@@ -58,8 +70,11 @@ class PAT_History_Controller {
 					'batch_id'     => (string) ( $batch['batch_id'] ?? '' ),
 					'action_type'  => (string) ( $batch['action_type'] ?? 'save' ),
 					'batch_time'   => (string) ( $batch['batch_time'] ?? '' ),
+					'actor_name'   => (string) ( $batch['actor_name'] ?? '' ),
+					'actor_user_id'=> (int) ( $batch['actor_user_id'] ?? 0 ),
 					'entity_count' => (int) ( $batch['entity_count'] ?? 0 ),
 					'field_count'  => (int) ( $batch['field_count'] ?? 0 ),
+					'entry_count'  => (int) ( $batch['entry_count'] ?? 0 ),
 					'undoable'     => '' !== $undo_batch_id
 					                  && (string) ( $batch['batch_id'] ?? '' ) === $undo_batch_id
 					                  && 'save' === (string) ( $batch['action_type'] ?? '' ),

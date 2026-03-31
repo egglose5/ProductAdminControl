@@ -55,30 +55,114 @@ class PAT_Save_Controller {
 			);
 		}
 
-		$results = array();
+		$results         = array();
 		$overall_success = true;
-		$batch_id = class_exists( 'PAT_Save_History_Store' ) ? PAT_Save_History_Store::generate_batch_id( 'save' ) : '';
-		$user_id = get_current_user_id();
-		$has_logged_changes = false;
+		$batch_id        = class_exists( 'PAT_Save_History_Store' ) ? PAT_Save_History_Store::generate_batch_id( 'save' ) : '';
+		$user_id         = get_current_user_id();
+		$successful_rows = array();
+		$failure_result  = null;
+		$failure_index   = null;
 
 		foreach ( $rows as $index => $row ) {
-			$result = $this->save_row( $row, $index, $batch_id, $user_id );
-
-			if ( ! empty( $result['_pat_history_logged'] ) ) {
-				$has_logged_changes = true;
-			}
-
-			unset( $result['_pat_history_logged'] );
+			$result    = $this->save_row( $row, $index );
 			$results[] = $result;
 
-			if ( isset( $result['status'] ) && 'error' === $result['status'] ) {
-				$overall_success = false;
+			if ( isset( $result['status'] ) && 'saved' === $result['status'] ) {
+				$successful_rows[] = $result;
+				continue;
+			}
+
+			$overall_success = false;
+			$failure_result  = $result;
+			$failure_index   = $index;
+			break;
+		}
+
+		if ( ! $overall_success ) {
+			$rollback = $this->rollback_successful_rows( $successful_rows, $batch_id, $user_id );
+			$error_message = ! empty( $rollback['success'] )
+				? __( 'Save canceled because one row failed. Completed row changes were rolled back.', 'product-admin-tool' )
+				: __( 'Save failed and automatic rollback could not fully complete. Review the affected rows before continuing.', 'product-admin-tool' );
+
+			foreach ( $successful_rows as $success_index => $successful_row ) {
+				$results[ $success_index ] = $this->build_rolled_back_result( $successful_row, $error_message );
+			}
+
+			if ( is_array( $failure_result ) ) {
+				$this->log_row_error(
+					$batch_id,
+					isset( $failure_result['row_type'] ) ? (string) $failure_result['row_type'] : '',
+					isset( $failure_result['id'] ) ? absint( $failure_result['id'] ) : 0,
+					$user_id,
+					isset( $failure_result['message'] ) ? (string) $failure_result['message'] : __( 'Save failed.', 'product-admin-tool' ),
+					array(
+						'index'         => $failure_index,
+						'changes'       => isset( $failure_result['changes'] ) && is_array( $failure_result['changes'] ) ? $failure_result['changes'] : array(),
+						'client_row_id' => isset( $failure_result['client_row_id'] ) ? (string) $failure_result['client_row_id'] : '',
+						'rolled_back'   => ! empty( $rollback['success'] ),
+					)
+				);
+			}
+
+			if ( empty( $rollback['success'] ) ) {
+				foreach ( $rollback['errors'] as $rollback_error ) {
+					$this->log_row_error(
+						$batch_id,
+						isset( $rollback_error['row_type'] ) ? (string) $rollback_error['row_type'] : '',
+						isset( $rollback_error['id'] ) ? absint( $rollback_error['id'] ) : 0,
+						$user_id,
+						isset( $rollback_error['message'] ) ? (string) $rollback_error['message'] : __( 'Automatic rollback failed.', 'product-admin-tool' ),
+						array(
+							'rollback' => true,
+						)
+					);
+				}
+			}
+
+			for ( $index = (int) $failure_index + 1; $index < count( $rows ); $index++ ) {
+				$results[] = $this->build_skipped_result(
+					$rows[ $index ],
+					$index,
+					__( 'Batch save was canceled before this row was written.', 'product-admin-tool' )
+				);
+			}
+		} else {
+			$has_logged_changes = false;
+
+			foreach ( $successful_rows as $successful_row ) {
+				$history_changes = isset( $successful_row['_pat_history_changes'] ) && is_array( $successful_row['_pat_history_changes'] )
+					? $successful_row['_pat_history_changes']
+					: array();
+
+				if ( empty( $history_changes ) || ! $this->history_store || '' === $batch_id ) {
+					continue;
+				}
+
+				$written = $this->history_store->log_field_changes(
+					$batch_id,
+					'save',
+					isset( $successful_row['row_type'] ) ? (string) $successful_row['row_type'] : '',
+					isset( $successful_row['id'] ) ? absint( $successful_row['id'] ) : 0,
+					$user_id,
+					$history_changes,
+					array(
+						'request_action' => self::AJAX_ACTION,
+						'created_entity' => ! empty( $successful_row['data']['is_created'] ),
+						'is_generated'   => ! empty( $successful_row['_pat_normalized_row']['is_generated'] ),
+					)
+				);
+
+				if ( $written > 0 ) {
+					$has_logged_changes = true;
+				}
+			}
+
+			if ( $has_logged_changes && $this->history_store && '' !== $batch_id ) {
+				$this->history_store->push_undo_batch( $user_id, $batch_id );
 			}
 		}
 
-		if ( $has_logged_changes && $this->history_store && '' !== $batch_id ) {
-			$this->history_store->push_undo_batch( $user_id, $batch_id );
-		}
+		$results = array_map( array( $this, 'strip_internal_result_metadata' ), $results );
 
 		wp_send_json(
 			array(
@@ -86,7 +170,7 @@ class PAT_Save_Controller {
 				'results' => $results,
 				'batch_id' => $batch_id,
 			),
-			$overall_success ? 200 : 207
+			$overall_success ? 200 : 409
 		);
 	}
 
@@ -97,12 +181,10 @@ class PAT_Save_Controller {
 	 * @param int   $index Row index.
 	 * @return array<string, mixed>
 	 */
-	private function save_row( $row, int $index, string $batch_id, int $user_id ): array {
+	private function save_row( $row, int $index ): array {
 		$normalized = $this->normalize_row( $row );
 
 		if ( is_wp_error( $normalized ) ) {
-			$this->log_row_error( $batch_id, '', 0, $user_id, $normalized->get_error_message(), array( 'index' => $index ) );
-
 			return $this->build_result(
 				$index,
 				0,
@@ -125,19 +207,6 @@ class PAT_Save_Controller {
 		$service_result = $this->dispatch_to_service( $normalized );
 
 		if ( is_wp_error( $service_result ) ) {
-			$this->log_row_error(
-				$batch_id,
-				$row_type,
-				$row_id,
-				$user_id,
-				$service_result->get_error_message(),
-				array(
-					'index'         => $index,
-					'changes'       => $changes,
-					'client_row_id' => $client_row_id,
-				)
-			);
-
 			return $this->build_result(
 				$index,
 				$row_id,
@@ -153,33 +222,16 @@ class PAT_Save_Controller {
 
 		$result_id = isset( $service_result['id'] ) ? $service_result['id'] : $row_id;
 		$status = isset( $service_result['status'] ) ? (string) $service_result['status'] : 'saved';
-		$history_logged = false;
-
-		if ( 'saved' === $status ) {
-			$history_logged = $this->log_successful_field_changes(
-				$batch_id,
+		$history_changes = 'saved' === $status
+			? $this->build_successful_field_changes(
 				$row_type,
 				absint( $result_id ),
-				$user_id,
 				$changes,
 				$before_values,
 				isset( $service_result['data'] ) && is_array( $service_result['data'] ) ? $service_result['data'] : array(),
 				$normalized
-			);
-		} else {
-			$this->log_row_error(
-				$batch_id,
-				$row_type,
-				$row_id,
-				$user_id,
-				isset( $service_result['message'] ) ? (string) $service_result['message'] : __( 'Save failed.', 'product-admin-tool' ),
-				array(
-					'index'   => $index,
-					'changes' => $changes,
-					'errors'  => isset( $service_result['errors'] ) && is_array( $service_result['errors'] ) ? $service_result['errors'] : array(),
-				)
-			);
-		}
+			)
+			: array();
 
 		return $this->build_result(
 			$index,
@@ -189,8 +241,9 @@ class PAT_Save_Controller {
 			array(
 				'row_type' => $row_type,
 				'changes'  => $changes,
-				'batch_id' => $batch_id,
-				'_pat_history_logged' => $history_logged,
+				'_pat_history_changes' => $history_changes,
+				'_pat_before_values' => $before_values,
+				'_pat_normalized_row' => $normalized,
 				'client_row_id' => isset( $service_result['client_row_id'] ) ? (string) $service_result['client_row_id'] : $client_row_id,
 				'data'     => isset( $service_result['data'] ) && is_array( $service_result['data'] ) ? $service_result['data'] : array(),
 				'errors'   => isset( $service_result['errors'] ) && is_array( $service_result['errors'] ) ? $service_result['errors'] : array(),
@@ -313,15 +366,11 @@ class PAT_Save_Controller {
 	 * @param array<string, mixed> $service_data Values returned after save.
 	 * @param array<string, mixed> $normalized_row Row payload.
 	 */
-	private function log_successful_field_changes( string $batch_id, string $row_type, int $row_id, int $user_id, array $changes, array $before_values, array $service_data, array $normalized_row ): bool {
-		if ( ! $this->history_store || '' === $batch_id ) {
-			return false;
-		}
-
+	private function build_successful_field_changes( string $row_type, int $row_id, array $changes, array $before_values, array $service_data, array $normalized_row ): array {
 		$fields = array_keys( $changes );
 
 		if ( empty( $fields ) ) {
-			return false;
+			return array();
 		}
 
 		$after_values = $this->fetch_entity_values( $row_type, $row_id, $fields );
@@ -356,22 +405,10 @@ class PAT_Save_Controller {
 		}
 
 		if ( empty( $history_changes ) ) {
-			return false;
+			return array();
 		}
 
-		$written = $this->history_store->log_field_changes(
-			$batch_id,
-			'save',
-			$row_type,
-			$row_id,
-			$user_id,
-			$history_changes,
-			array(
-				'request_action' => self::AJAX_ACTION,
-			)
-		);
-
-		return $written > 0;
+		return $history_changes;
 	}
 
 	/**
@@ -406,6 +443,129 @@ class PAT_Save_Controller {
 		}
 
 		return wp_json_encode( $value );
+	}
+
+	/**
+	 * Attempt to restore previously saved rows after a later row fails.
+	 *
+	 * @param array<int, array<string, mixed>> $successful_rows Successful row results.
+	 * @return array<string, mixed>
+	 */
+	private function rollback_successful_rows( array $successful_rows, string $batch_id, int $user_id ): array {
+		$errors = array();
+		$successful_rows = array_reverse( $successful_rows );
+
+		foreach ( $successful_rows as $row_result ) {
+			$normalized   = isset( $row_result['_pat_normalized_row'] ) && is_array( $row_result['_pat_normalized_row'] ) ? $row_result['_pat_normalized_row'] : array();
+			$before_values = isset( $row_result['_pat_before_values'] ) && is_array( $row_result['_pat_before_values'] ) ? $row_result['_pat_before_values'] : array();
+			$row_type     = isset( $normalized['row_type'] ) ? sanitize_key( (string) $normalized['row_type'] ) : '';
+			$row_id       = isset( $row_result['id'] ) ? absint( $row_result['id'] ) : 0;
+
+			if ( 'variation' === $row_type && ! empty( $normalized['is_generated'] ) && ! empty( $row_result['data']['is_created'] ) ) {
+				if ( $row_id <= 0 || ! function_exists( 'wp_delete_post' ) || false === wp_delete_post( $row_id, true ) ) {
+					$errors[] = array(
+						'row_type' => $row_type,
+						'id'       => $row_id,
+						'message'  => __( 'Generated variation could not be removed during rollback.', 'product-admin-tool' ),
+					);
+				}
+
+				continue;
+			}
+
+			$inverse_changes = array();
+
+			foreach ( isset( $normalized['changes'] ) && is_array( $normalized['changes'] ) ? $normalized['changes'] : array() as $field_key => $unused_value ) {
+				$inverse_changes[ $field_key ] = $before_values[ $field_key ] ?? '';
+			}
+
+			if ( empty( $inverse_changes ) ) {
+				continue;
+			}
+
+			$inverse_row = array(
+				'id'       => $row_id,
+				'row_type' => $row_type,
+				'changes'  => $inverse_changes,
+			);
+
+			if ( 'variation' === $row_type && ! empty( $normalized['parent_id'] ) ) {
+				$inverse_row['parent_id'] = absint( $normalized['parent_id'] );
+			}
+
+			$rollback_result = $this->dispatch_to_service( $inverse_row );
+
+			if ( is_wp_error( $rollback_result ) || ! isset( $rollback_result['status'] ) || 'saved' !== $rollback_result['status'] ) {
+				$errors[] = array(
+					'row_type' => $row_type,
+					'id'       => $row_id,
+					'message'  => is_wp_error( $rollback_result )
+						? $rollback_result->get_error_message()
+						: ( isset( $rollback_result['message'] ) ? (string) $rollback_result['message'] : __( 'Rollback failed.', 'product-admin-tool' ) ),
+				);
+			}
+		}
+
+		return array(
+			'success' => empty( $errors ),
+			'errors'  => $errors,
+			'batch_id' => $batch_id,
+			'user_id' => $user_id,
+		);
+	}
+
+	/**
+	 * Convert a previously-saved result into a rolled-back error state.
+	 */
+	private function build_rolled_back_result( array $result, string $message ): array {
+		$result['status']  = 'error';
+		$result['message'] = $message;
+		$result['errors']  = array(
+			'row' => $message,
+		);
+
+		return $result;
+	}
+
+	/**
+	 * Build an error result for a row that was never attempted because the batch was canceled.
+	 *
+	 * @param mixed $row Raw row payload.
+	 * @return array<string, mixed>
+	 */
+	private function build_skipped_result( $row, int $index, string $message ): array {
+		$row_id = is_array( $row ) && isset( $row['id'] ) ? absint( $row['id'] ) : 0;
+		$row_type = is_array( $row ) && isset( $row['row_type'] ) ? sanitize_key( (string) $row['row_type'] ) : '';
+		$client_row_id = is_array( $row ) && isset( $row['client_row_id'] )
+			? sanitize_text_field( (string) $row['client_row_id'] )
+			: ( $row_id > 0 ? (string) $row_id : '' );
+
+		return $this->build_result(
+			$index,
+			$row_id,
+			'error',
+			$message,
+			array(
+				'row_type'      => $row_type,
+				'client_row_id' => $client_row_id,
+				'errors'        => array(
+					'row' => $message,
+				),
+			)
+		);
+	}
+
+	/**
+	 * Remove server-only metadata before returning a result to the browser.
+	 */
+	private function strip_internal_result_metadata( array $result ): array {
+		unset(
+			$result['_pat_history_changes'],
+			$result['_pat_before_values'],
+			$result['_pat_normalized_row']
+		);
+
+		return $result;
 	}
 
 	/**
