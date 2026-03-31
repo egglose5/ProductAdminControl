@@ -688,23 +688,62 @@
 	function collectDirtyRows(root) {
 		var rows = [];
 		var dirtyRowNodes = getDirtyRowElements(root);
+		var generatedRowNodes = root.querySelectorAll(ROW_SELECTOR + '[data-pat-generated="true"]');
+		var rowMap = Object.create(null);
 
 		Array.prototype.forEach.call(dirtyRowNodes, function (row) {
+			var key = row.getAttribute('data-pat-row-id') || '';
+			rowMap[key] = row;
+		});
+
+		Array.prototype.forEach.call(generatedRowNodes, function (row) {
+			var key = row.getAttribute('data-pat-row-id') || '';
+
+			if (!rowMap[key]) {
+				rowMap[key] = row;
+			}
+		});
+
+		Object.keys(rowMap).forEach(function (key) {
+			var row = rowMap[key];
 			var changes = {};
 			var fields = row.querySelectorAll(FIELD_SELECTOR);
+			var isGenerated = 'true' === row.getAttribute('data-pat-generated');
 
 			Array.prototype.forEach.call(fields, function (field) {
-				if (!isFieldDirty(field)) {
+				if (!isGenerated && !isFieldDirty(field)) {
 					return;
 				}
 
 				changes[field.getAttribute('data-pat-field')] = readFieldValue(field);
 			});
 
+			if (isGenerated && !Object.keys(changes).length) {
+				return;
+			}
+
+			var attributes = {};
+			var rawAttributes = row.getAttribute('data-pat-generated-attributes');
+
+			if (rawAttributes) {
+				try {
+					attributes = JSON.parse(rawAttributes);
+				} catch (e) {
+					attributes = {};
+				}
+			}
+
+			var rowIdRaw = row.getAttribute('data-pat-row-id') || '';
+
 			rows.push({
-				id: parseInt(row.getAttribute('data-pat-row-id'), 10) || 0,
+				id: parseInt(rowIdRaw, 10) || 0,
+				client_row_id: rowIdRaw,
 				row_type: getRowType(row),
-				changes: changes
+				changes: changes,
+				is_generated: isGenerated,
+				temp_id: row.getAttribute('data-pat-temp-id') || '',
+				parent_id: parseInt(row.getAttribute('data-pat-parent-id'), 10) || 0,
+				attributes: attributes
 			});
 		});
 
@@ -721,10 +760,12 @@
 
 	function setRowSavedState(row, result) {
 		var fields = row.querySelectorAll(FIELD_SELECTOR);
+		var responseData = result && result.data ? result.data : {};
+		var createdId = responseData && Object.prototype.hasOwnProperty.call(responseData, 'id') ? toStringValue(responseData.id) : '';
 
 		Array.prototype.forEach.call(fields, function (field) {
 			var fieldName = field.getAttribute('data-pat-field');
-			var newValue = result && result.data && Object.prototype.hasOwnProperty.call(result.data, fieldName) ? result.data[fieldName] : readFieldValue(field);
+			var newValue = responseData && Object.prototype.hasOwnProperty.call(responseData, fieldName) ? responseData[fieldName] : readFieldValue(field);
 
 			if (field.isContentEditable) {
 				field.textContent = toStringValue(newValue);
@@ -740,6 +781,41 @@
 			field.removeAttribute('title');
 			field.setAttribute('data-pat-field-state', 'clean');
 		});
+
+		if (createdId) {
+			row.setAttribute('data-pat-row-id', createdId);
+			row.setAttribute('data-pat-generated', 'false');
+			row.removeAttribute('data-pat-temp-id');
+			row.removeAttribute('data-pat-generated-attributes');
+			row.classList.remove('is-generated-row');
+
+			Array.prototype.forEach.call(fields, function (field) {
+				field.setAttribute('data-pat-row-id', createdId);
+			});
+
+			var idNode = row.querySelector('.pat-row-id');
+
+			if (idNode) {
+				idNode.textContent = 'ID: ' + createdId;
+			}
+
+			var existingBadges = row.querySelectorAll('.pat-row-meta .pat-badge');
+
+			Array.prototype.forEach.call(existingBadges, function (badge) {
+				badge.parentNode.removeChild(badge);
+			});
+
+			if (responseData && responseData.is_created) {
+				var rowMeta = row.querySelector('.pat-row-meta');
+
+				if (rowMeta) {
+					var createdBadge = document.createElement('span');
+					createdBadge.className = 'pat-badge';
+					createdBadge.textContent = 'Created';
+					rowMeta.insertBefore(createdBadge, rowMeta.firstChild);
+				}
+			}
+		}
 
 		setRowState(row, 'saved', result && result.message ? result.message : 'Saved');
 	}
@@ -767,16 +843,29 @@
 		var resultMap = Object.create(null);
 
 		Array.prototype.forEach.call(results, function (result) {
-			if (!result || 'number' !== typeof result.id && 'string' !== typeof result.id) {
+			if (!result) {
 				return;
 			}
 
-			resultMap[String(result.id)] = result;
+			var resultKey = '';
+
+			if (result.client_row_id) {
+				resultKey = String(result.client_row_id);
+			} else if ('number' === typeof result.id || 'string' === typeof result.id) {
+				resultKey = String(result.id);
+			}
+
+			if (!resultKey) {
+				return;
+			}
+
+			resultMap[resultKey] = result;
 		});
 
 		requestRows.forEach(function (requestedRow) {
-			var row = root.querySelector(ROW_SELECTOR + '[data-pat-row-id="' + requestedRow.id + '"]');
-			var result = resultMap[String(requestedRow.id)];
+			var requestKey = requestedRow.client_row_id ? String(requestedRow.client_row_id) : String(requestedRow.id);
+			var row = root.querySelector(ROW_SELECTOR + '[data-pat-row-id="' + requestKey + '"]');
+			var result = resultMap[requestKey];
 
 			if (!row) {
 				return;
@@ -836,7 +925,8 @@
 		}
 
 		payload.rows.forEach(function (row) {
-			var rowNode = root.querySelector(ROW_SELECTOR + '[data-pat-row-id="' + row.id + '"]');
+			var lookupKey = row.client_row_id ? row.client_row_id : String(row.id);
+			var rowNode = root.querySelector(ROW_SELECTOR + '[data-pat-row-id="' + lookupKey + '"]');
 
 			if (rowNode) {
 				setRowSavingState(rowNode);

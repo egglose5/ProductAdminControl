@@ -94,6 +94,7 @@ class PAT_Save_Controller {
 		$row_id   = $normalized['id'];
 		$row_type = $normalized['row_type'];
 		$changes  = $normalized['changes'];
+		$client_row_id = isset( $normalized['client_row_id'] ) ? (string) $normalized['client_row_id'] : (string) $row_id;
 
 		$service_result = $this->dispatch_to_service( $normalized );
 
@@ -111,14 +112,17 @@ class PAT_Save_Controller {
 			);
 		}
 
+		$result_id = isset( $service_result['id'] ) ? $service_result['id'] : $row_id;
+
 		return $this->build_result(
 			$index,
-			$row_id,
+			$result_id,
 			isset( $service_result['status'] ) ? (string) $service_result['status'] : 'saved',
 			isset( $service_result['message'] ) ? (string) $service_result['message'] : __( 'Saved successfully.', 'product-admin-tool' ),
 			array(
 				'row_type' => $row_type,
 				'changes'  => $changes,
+				'client_row_id' => isset( $service_result['client_row_id'] ) ? (string) $service_result['client_row_id'] : $client_row_id,
 				'data'     => isset( $service_result['data'] ) && is_array( $service_result['data'] ) ? $service_result['data'] : array(),
 				'errors'   => isset( $service_result['errors'] ) && is_array( $service_result['errors'] ) ? $service_result['errors'] : array(),
 			)
@@ -188,23 +192,43 @@ class PAT_Save_Controller {
 		$row_id = isset( $row['id'] ) ? absint( $row['id'] ) : 0;
 		$row_type = isset( $row['row_type'] ) ? sanitize_key( (string) $row['row_type'] ) : '';
 		$changes = isset( $row['changes'] ) ? $row['changes'] : array();
-
-		if ( $row_id <= 0 ) {
-			return new WP_Error( 'pat_missing_row_id', __( 'Each row must include a valid id.', 'product-admin-tool' ) );
-		}
+		$client_row_id = isset( $row['client_row_id'] ) ? sanitize_text_field( (string) $row['client_row_id'] ) : ( isset( $row['id'] ) ? sanitize_text_field( (string) $row['id'] ) : '' );
+		$is_generated = ! empty( $row['is_generated'] );
+		$parent_id = isset( $row['parent_id'] ) ? absint( $row['parent_id'] ) : 0;
+		$temp_id = isset( $row['temp_id'] ) ? sanitize_text_field( (string) $row['temp_id'] ) : '';
+		$attributes = isset( $row['attributes'] ) && is_array( $row['attributes'] ) ? $row['attributes'] : array();
 
 		if ( ! in_array( $row_type, array( 'product', 'variation' ), true ) ) {
 			return new WP_Error( 'pat_missing_row_type', __( 'Each row must declare a valid row_type.', 'product-admin-tool' ) );
+		}
+
+		if ( $row_id <= 0 && ! ( 'variation' === $row_type && $is_generated ) ) {
+			return new WP_Error( 'pat_missing_row_id', __( 'Each row must include a valid id.', 'product-admin-tool' ) );
 		}
 
 		if ( ! is_array( $changes ) ) {
 			return new WP_Error( 'pat_invalid_changes', __( 'Each row must include a changes array.', 'product-admin-tool' ) );
 		}
 
+		if ( 'variation' === $row_type && $is_generated ) {
+			if ( $parent_id <= 0 ) {
+				return new WP_Error( 'pat_missing_parent_id', __( 'Generated variation rows must include a valid parent_id.', 'product-admin-tool' ) );
+			}
+
+			if ( empty( $attributes ) ) {
+				return new WP_Error( 'pat_missing_attributes', __( 'Generated variation rows must include attributes.', 'product-admin-tool' ) );
+			}
+		}
+
 		return array(
 			'id'       => $row_id,
 			'row_type' => $row_type,
 			'changes'  => $changes,
+			'client_row_id' => $client_row_id,
+			'is_generated' => $is_generated,
+			'parent_id' => $parent_id,
+			'temp_id' => $temp_id,
+			'attributes' => $attributes,
 		);
 	}
 
@@ -251,7 +275,7 @@ class PAT_Save_Controller {
 	 * @param array  $extra       Additional payload data.
 	 * @return array<string, mixed>
 	 */
-	private function build_result( int $index, int $row_id, string $status, string $message, array $extra = array() ): array {
+	private function build_result( int $index, $row_id, string $status, string $message, array $extra = array() ): array {
 		return array_merge(
 			array(
 				'index'   => $index,

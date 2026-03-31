@@ -18,6 +18,12 @@ class PAT_Variation_Save_Service {
 	 * @return array<string, mixed>
 	 */
 	public function save_row( array $row ): array {
+		$is_generated_row = ! empty( $row['is_generated'] ) || ( isset( $row['id'] ) && absint( $row['id'] ) <= 0 && ! empty( $row['temp_id'] ) );
+
+		if ( $is_generated_row ) {
+			return $this->create_generated_variation( $row );
+		}
+
 		$validation = $this->validate_row_payload( $row );
 
 		if ( is_wp_error( $validation ) ) {
@@ -25,6 +31,14 @@ class PAT_Variation_Save_Service {
 				isset( $row['id'] ) ? absint( $row['id'] ) : 0,
 				$validation->get_error_message(),
 				$validation->get_error_data()
+			);
+		}
+
+		if ( ! is_array( $validation ) ) {
+			return $this->error_result(
+				isset( $row['id'] ) ? absint( $row['id'] ) : 0,
+				__( 'Invalid row payload.', 'product-admin-tool' ),
+				array()
 			);
 		}
 
@@ -77,10 +91,207 @@ class PAT_Variation_Save_Service {
 	}
 
 	/**
+	 * Create a new WooCommerce variation from a generated preview row.
+	 *
+	 * @param array $row Generated row payload.
+	 * @return array<string, mixed>
+	 */
+	private function create_generated_variation( array $row ): array {
+		$parent_id = isset( $row['parent_id'] ) ? absint( $row['parent_id'] ) : 0;
+		$attributes = isset( $row['attributes'] ) && is_array( $row['attributes'] ) ? $row['attributes'] : array();
+		$client_row_id = isset( $row['client_row_id'] ) ? sanitize_text_field( (string) $row['client_row_id'] ) : ( isset( $row['temp_id'] ) ? sanitize_text_field( (string) $row['temp_id'] ) : '' );
+
+		if ( $parent_id <= 0 ) {
+			return $this->error_result( 0, __( 'Generated variation parent is missing.', 'product-admin-tool' ), array( 'parent_id' => __( 'Parent ID is required.', 'product-admin-tool' ) ), array( 'client_row_id' => $client_row_id ) );
+		}
+
+		$parent = wc_get_product( $parent_id );
+
+		if ( ! $parent || ! is_object( $parent ) || ! method_exists( $parent, 'is_type' ) || ! $parent->is_type( 'variable' ) ) {
+			return $this->error_result( 0, __( 'Generated variation parent is invalid.', 'product-admin-tool' ), array( 'parent_id' => __( 'Parent product must be variable.', 'product-admin-tool' ) ), array( 'client_row_id' => $client_row_id ) );
+		}
+
+		$variation_attributes = $this->sanitize_variation_attributes( $attributes );
+
+		if ( empty( $variation_attributes ) ) {
+			return $this->error_result( 0, __( 'Generated variation attributes are missing.', 'product-admin-tool' ), array( 'attributes' => __( 'Variation attributes are required.', 'product-admin-tool' ) ), array( 'client_row_id' => $client_row_id ) );
+		}
+
+		$duplicate_variation_id = $this->find_duplicate_variation_id( $parent, $variation_attributes );
+
+		if ( $duplicate_variation_id > 0 ) {
+			return $this->error_result(
+				0,
+				__( 'This variation combination already exists.', 'product-admin-tool' ),
+				array(
+					'attributes' => __( 'A variation with this attribute combination already exists.', 'product-admin-tool' ),
+				),
+				array(
+					'client_row_id' => $client_row_id,
+					'data' => array(
+						'duplicate_variation_id' => $duplicate_variation_id,
+					),
+				)
+			);
+		}
+
+		$variation = new WC_Product_Variation();
+		$variation->set_parent_id( $parent_id );
+		$variation->set_attributes( $variation_attributes );
+
+		$changes = $this->normalize_changes( isset( $row['changes'] ) && is_array( $row['changes'] ) ? $row['changes'] : array() );
+
+		if ( ! isset( $changes['status'] ) || '' === (string) $changes['status'] ) {
+			$changes['status'] = 'draft';
+		}
+
+		$errors = array();
+
+		foreach ( $changes as $field => $value ) {
+			$applied = $this->apply_change( $variation, $field, $value );
+
+			if ( is_wp_error( $applied ) ) {
+				$errors[ $field ] = $applied->get_error_message();
+			}
+		}
+
+		if ( ! empty( $errors ) ) {
+			return $this->error_result( 0, __( 'One or more fields could not be saved.', 'product-admin-tool' ), $errors, array( 'client_row_id' => $client_row_id ) );
+		}
+
+		try {
+			$variation->save();
+		} catch ( Exception $exception ) {
+			return $this->error_result( 0, $exception->getMessage(), array(), array( 'client_row_id' => $client_row_id ) );
+		}
+
+		return $this->success_result(
+			$variation,
+			array(
+				'client_row_id' => $client_row_id,
+				'message' => __( 'Variation created successfully.', 'product-admin-tool' ),
+				'data' => array_merge(
+					$this->normalize_saved_variation( $variation ),
+					array(
+						'is_created' => true,
+					)
+				),
+			)
+		);
+	}
+
+	/**
+	 * Find existing variation id with the same normalized attribute signature.
+	 *
+	 * @param object $parent Parent variable product.
+	 * @param array<string, string> $attributes Proposed variation attributes.
+	 * @return int
+	 */
+	private function find_duplicate_variation_id( $parent, array $attributes ): int {
+		if ( ! is_object( $parent ) || ! method_exists( $parent, 'get_children' ) ) {
+			return 0;
+		}
+
+		$target_signature = $this->build_attribute_signature( $attributes );
+
+		if ( '' === $target_signature ) {
+			return 0;
+		}
+
+		foreach ( (array) $parent->get_children() as $child_id ) {
+			$child_id = absint( $child_id );
+
+			if ( $child_id <= 0 ) {
+				continue;
+			}
+
+			$variation = wc_get_product( $child_id );
+
+			if ( ! $variation instanceof WC_Product_Variation ) {
+				continue;
+			}
+
+			$existing_signature = $this->build_attribute_signature( (array) $variation->get_variation_attributes() );
+
+			if ( '' !== $existing_signature && $existing_signature === $target_signature ) {
+				return $child_id;
+			}
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Build a normalized signature string from variation attributes.
+	 *
+	 * @param array<string, string> $attributes Variation attributes.
+	 * @return string
+	 */
+	private function build_attribute_signature( array $attributes ): string {
+		$normalized = array();
+
+		foreach ( $attributes as $key => $value ) {
+			$attribute_key = sanitize_key( (string) $key );
+			$attribute_value = sanitize_title( (string) $value );
+
+			if ( '' === $attribute_key || '' === $attribute_value ) {
+				continue;
+			}
+
+			if ( 0 !== strpos( $attribute_key, 'attribute_' ) ) {
+				$attribute_key = 'attribute_' . $attribute_key;
+			}
+
+			$normalized[ $attribute_key ] = $attribute_value;
+		}
+
+		if ( empty( $normalized ) ) {
+			return '';
+		}
+
+		ksort( $normalized );
+
+		$parts = array();
+
+		foreach ( $normalized as $attribute_key => $attribute_value ) {
+			$parts[] = $attribute_key . '=' . $attribute_value;
+		}
+
+		return implode( '|', $parts );
+	}
+
+	/**
+	 * Normalize variation attribute payload for WC_Product_Variation::set_attributes.
+	 *
+	 * @param array $attributes Raw attributes.
+	 * @return array<string, string>
+	 */
+	private function sanitize_variation_attributes( array $attributes ): array {
+		$sanitized = array();
+
+		foreach ( $attributes as $key => $value ) {
+			$attribute_key = sanitize_key( (string) $key );
+			$attribute_value = sanitize_title( (string) $value );
+
+			if ( '' === $attribute_key || '' === $attribute_value ) {
+				continue;
+			}
+
+			if ( 0 !== strpos( $attribute_key, 'attribute_' ) ) {
+				$attribute_key = 'attribute_' . $attribute_key;
+			}
+
+			$sanitized[ $attribute_key ] = $attribute_value;
+		}
+
+		return $sanitized;
+	}
+
+	/**
 	 * Validate the row payload before saving.
 	 *
 	 * @param array $row Row payload.
-	 * @return true|WP_Error
+	 * @return true|array<string, mixed>|WP_Error
 	 */
 	private function validate_row_payload( array $row ) {
 		if ( class_exists( 'PAT_Row_Validation' ) && method_exists( 'PAT_Row_Validation', 'validate_row' ) ) {
@@ -243,7 +454,7 @@ class PAT_Variation_Save_Service {
 	 * @param WC_Product_Variation $variation Variation object.
 	 * @return array<string, mixed>
 	 */
-	private function success_result( WC_Product_Variation $variation ): array {
+	private function success_result( WC_Product_Variation $variation, array $extra = array() ): array {
 		$data = array(
 			'id'               => $variation->get_id(),
 			'row_type'         => self::ROW_TYPE,
@@ -253,10 +464,10 @@ class PAT_Variation_Save_Service {
 		);
 
 		if ( class_exists( 'PAT_Save_Result' ) && method_exists( 'PAT_Save_Result', 'success' ) ) {
-			return PAT_Save_Result::success( $data['id'], $data['row_type'], $data['message'], $data['data'] );
+			return array_merge( PAT_Save_Result::success( $data['id'], $data['row_type'], $data['message'], $data['data'] ), $extra );
 		}
 
-		return $data;
+		return array_merge( $data, $extra );
 	}
 
 	/**
@@ -267,7 +478,7 @@ class PAT_Variation_Save_Service {
 	 * @param array|null  $errors  Optional field errors.
 	 * @return array<string, mixed>
 	 */
-	private function error_result( int $id, string $message, ?array $errors = null ): array {
+	private function error_result( int $id, string $message, ?array $errors = null, array $extra = array() ): array {
 		$data = array(
 			'id'       => $id,
 			'row_type' => self::ROW_TYPE,
@@ -277,10 +488,10 @@ class PAT_Variation_Save_Service {
 		);
 
 		if ( class_exists( 'PAT_Save_Result' ) && method_exists( 'PAT_Save_Result', 'error' ) ) {
-			return PAT_Save_Result::error( $data['id'], $data['row_type'], $data['message'], $data['errors'] );
+			return array_merge( PAT_Save_Result::error( $data['id'], $data['row_type'], $data['message'], $data['errors'] ), $extra );
 		}
 
-		return $data;
+		return array_merge( $data, $extra );
 	}
 
 	/**

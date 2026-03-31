@@ -122,6 +122,7 @@ class PAT_Variation_Row_Renderer {
 			$rows[] = array(
 				'id'                => $row_id,
 				'temp_id'           => $temp_id,
+				'parent_id'         => isset( $variation_row['parent_id'] ) ? (int) $variation_row['parent_id'] : 0,
 				'title'             => isset( $variation_row['title'] ) ? (string) $variation_row['title'] : '',
 				'sku'               => isset( $variation_row['sku'] ) ? (string) $variation_row['sku'] : '',
 				'price'             => isset( $variation_row['price'] ) ? (string) $variation_row['price'] : '',
@@ -133,6 +134,7 @@ class PAT_Variation_Row_Renderer {
 				'menu_order'        => isset( $variation_row['menu_order'] ) ? (int) $variation_row['menu_order'] : 0,
 				'is_generated'      => ! empty( $variation_row['is_generated'] ),
 				'is_preview'        => ! empty( $variation_row['is_preview'] ),
+				'attributes'        => isset( $variation_row['attributes'] ) && is_array( $variation_row['attributes'] ) ? $variation_row['attributes'] : array(),
 				'attribute_summary' => isset( $variation_row['attribute_summary'] ) ? (string) $variation_row['attribute_summary'] : '',
 			);
 		}
