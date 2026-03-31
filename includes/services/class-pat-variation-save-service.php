@@ -91,6 +91,52 @@ class PAT_Variation_Save_Service {
 	}
 
 	/**
+	 * Permanently delete a variation row.
+	 *
+	 * @param int $variation_id Variation ID.
+	 * @return array<string, mixed>
+	 */
+	public function delete_row( int $variation_id ): array {
+		$variation_id = absint( $variation_id );
+
+		if ( $variation_id <= 0 ) {
+			return $this->error_result( 0, __( 'Variation ID is required for deletion.', 'product-admin-tool' ) );
+		}
+
+		if ( ! function_exists( 'wc_get_product' ) ) {
+			return $this->error_result( $variation_id, __( 'WooCommerce is not available.', 'product-admin-tool' ) );
+		}
+
+		$variation = wc_get_product( $variation_id );
+
+		if ( ! $variation instanceof WC_Product_Variation ) {
+			return $this->error_result( $variation_id, __( 'Variation could not be loaded.', 'product-admin-tool' ) );
+		}
+
+		$parent_id = $variation->get_parent_id();
+		$deleted   = wp_delete_post( $variation_id, true );
+
+		if ( ! $deleted ) {
+			return $this->error_result( $variation_id, __( 'Variation could not be deleted.', 'product-admin-tool' ) );
+		}
+
+		return array(
+			'id'            => $variation_id,
+			'client_row_id' => (string) $variation_id,
+			'row_type'      => self::ROW_TYPE,
+			'status'        => 'deleted',
+			'message'       => __( 'Variation deleted successfully.', 'product-admin-tool' ),
+			'data'          => array(
+				'id'         => $variation_id,
+				'parent_id'  => $parent_id,
+				'row_type'   => self::ROW_TYPE,
+				'is_deleted' => true,
+			),
+			'errors'        => array(),
+		);
+	}
+
+	/**
 	 * Create a new WooCommerce variation from a generated preview row.
 	 *
 	 * @param array $row Generated row payload.

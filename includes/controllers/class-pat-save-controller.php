@@ -359,6 +359,17 @@ class PAT_Save_Controller {
 			return false;
 		}
 
+		$history_context = array(
+			'request_action' => self::AJAX_ACTION,
+		);
+
+		if ( 'variation' === $row_type && ! empty( $normalized_row['is_generated'] ) && ! empty( $service_data['is_created'] ) ) {
+			$history_context['undo_strategy']         = 'delete_created_variation';
+			$history_context['created_from_generated'] = true;
+			$history_context['client_row_id']         = isset( $normalized_row['client_row_id'] ) ? (string) $normalized_row['client_row_id'] : (string) $row_id;
+			$history_context['parent_id']             = $parent_id;
+		}
+
 		$written = $this->history_store->log_field_changes(
 			$batch_id,
 			'save',
@@ -366,9 +377,7 @@ class PAT_Save_Controller {
 			$row_id,
 			$user_id,
 			$history_changes,
-			array(
-				'request_action' => self::AJAX_ACTION,
-			)
+			$history_context
 		);
 
 		return $written > 0;

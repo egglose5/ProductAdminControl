@@ -201,6 +201,7 @@ class PAT_Save_History_Store {
 				$row['user_id']   = absint( $row['user_id'] ?? 0 );
 				$row['old_value'] = $this->deserialize_value( $row['old_value'] ?? '' );
 				$row['new_value'] = $this->deserialize_value( $row['new_value'] ?? '' );
+				$row['request_context'] = $this->deserialize_context( $row['request_context'] ?? '' );
 
 				return $row;
 			},
@@ -364,6 +365,26 @@ class PAT_Save_History_Store {
 
 		if ( JSON_ERROR_NONE !== json_last_error() ) {
 			return $value;
+		}
+
+		return $decoded;
+	}
+
+	/**
+	 * Decode stored request context payload.
+	 *
+	 * @param mixed $value Stored context value.
+	 * @return array<string, mixed>
+	 */
+	private function deserialize_context( $value ): array {
+		if ( ! is_string( $value ) || '' === $value ) {
+			return array();
+		}
+
+		$decoded = json_decode( $value, true );
+
+		if ( JSON_ERROR_NONE !== json_last_error() || ! is_array( $decoded ) ) {
+			return array();
 		}
 
 		return $decoded;

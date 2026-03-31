@@ -46,7 +46,9 @@ class PAT_Undo_Controller {
 
 		$store   = new PAT_Save_History_Store();
 		$user_id = get_current_user_id();
-		$batch_id = $store->peek_undo_batch( $user_id );
+		$latest_batch_id = $store->peek_undo_batch( $user_id );
+		$requested_batch_id = isset( $_POST['batch_id'] ) ? sanitize_text_field( wp_unslash( $_POST['batch_id'] ) ) : '';
+		$batch_id = '' !== $requested_batch_id ? $requested_batch_id : $latest_batch_id;
 
 		if ( '' === $batch_id ) {
 			wp_send_json_success(
@@ -55,6 +57,17 @@ class PAT_Undo_Controller {
 					'results' => array(),
 					'message' => __( 'No save history is available to undo.', 'product-admin-tool' ),
 				)
+			);
+		}
+
+		if ( '' !== $requested_batch_id && $requested_batch_id !== $latest_batch_id ) {
+			wp_send_json_error(
+				array(
+					'success' => false,
+					'results' => array(),
+					'message' => __( 'That batch is no longer the latest undoable save. Refresh history and try again.', 'product-admin-tool' ),
+				),
+				409
 			);
 		}
 
@@ -77,13 +90,14 @@ class PAT_Undo_Controller {
 		$undo_batch_id = PAT_Save_History_Store::generate_batch_id( 'undo' );
 
 		foreach ( $inverse_rows as $row_key => $row ) {
-			$service_result = $this->dispatch_to_service( $row );
+			$service_result = $this->dispatch_undo_row( $row );
 			$status         = isset( $service_result['status'] ) ? (string) $service_result['status'] : 'error';
 			$row_id         = isset( $service_result['id'] ) ? absint( $service_result['id'] ) : absint( $row['id'] );
+			$client_row_id  = isset( $service_result['client_row_id'] ) ? (string) $service_result['client_row_id'] : ( isset( $row['client_row_id'] ) ? (string) $row['client_row_id'] : (string) $row_id );
 
 			$results[] = array(
 				'id'            => $row_id,
-				'client_row_id' => (string) $row_id,
+				'client_row_id' => $client_row_id,
 				'row_type'      => $row['row_type'],
 				'status'        => $status,
 				'message'       => isset( $service_result['message'] ) ? (string) $service_result['message'] : __( 'Undo failed for row.', 'product-admin-tool' ),
@@ -91,7 +105,7 @@ class PAT_Undo_Controller {
 				'errors'        => isset( $service_result['errors'] ) && is_array( $service_result['errors'] ) ? $service_result['errors'] : array(),
 			);
 
-			if ( 'saved' !== $status ) {
+			if ( ! in_array( $status, array( 'saved', 'deleted' ), true ) ) {
 				$overall_success = false;
 				$store->log_error(
 					$undo_batch_id,
@@ -102,6 +116,28 @@ class PAT_Undo_Controller {
 					array(
 						'source_batch_id' => $batch_id,
 						'row_key'         => $row_key,
+					)
+				);
+				continue;
+			}
+
+			if ( 'deleted' === $status ) {
+				$store->log_field_changes(
+					$undo_batch_id,
+					'undo',
+					$row['row_type'],
+					$row_id,
+					$user_id,
+					array(
+						array(
+							'field_key' => 'entity_state',
+							'old_value' => 'created',
+							'new_value' => 'deleted',
+							'parent_id' => isset( $row['parent_id'] ) ? absint( $row['parent_id'] ) : 0,
+						),
+					),
+					array(
+						'source_batch_id' => $batch_id,
 					)
 				);
 				continue;
@@ -163,6 +199,7 @@ class PAT_Undo_Controller {
 			$row_type = isset( $entry['row_type'] ) ? sanitize_key( (string) $entry['row_type'] ) : '';
 			$entity_id = isset( $entry['entity_id'] ) ? absint( $entry['entity_id'] ) : 0;
 			$field_key = isset( $entry['field_key'] ) ? sanitize_key( (string) $entry['field_key'] ) : '';
+			$request_context = isset( $entry['request_context'] ) && is_array( $entry['request_context'] ) ? $entry['request_context'] : array();
 
 			if ( '' === $row_type || 0 === $entity_id || '' === $field_key ) {
 				continue;
@@ -175,9 +212,23 @@ class PAT_Undo_Controller {
 					'id'              => $entity_id,
 					'row_type'        => $row_type,
 					'parent_id'       => isset( $entry['parent_id'] ) ? absint( $entry['parent_id'] ) : 0,
+					'client_row_id'   => (string) $entity_id,
+					'undo_strategy'   => '',
 					'changes'         => array(),
 					'forward_changes' => array(),
 				);
+			}
+
+			if ( ! empty( $request_context['client_row_id'] ) ) {
+				$rows[ $row_key ]['client_row_id'] = sanitize_text_field( (string) $request_context['client_row_id'] );
+			}
+
+			if ( ! empty( $request_context['undo_strategy'] ) ) {
+				$rows[ $row_key ]['undo_strategy'] = sanitize_key( (string) $request_context['undo_strategy'] );
+			}
+
+			if ( empty( $rows[ $row_key ]['parent_id'] ) && ! empty( $request_context['parent_id'] ) ) {
+				$rows[ $row_key ]['parent_id'] = absint( $request_context['parent_id'] );
 			}
 
 			$rows[ $row_key ]['changes'][ $field_key ] = $entry['old_value'];
@@ -188,6 +239,23 @@ class PAT_Undo_Controller {
 		}
 
 		return $rows;
+	}
+
+	/**
+	 * Dispatch a single undo row, including delete-based reversals.
+	 *
+	 * @param array<string, mixed> $row Inverse row payload.
+	 * @return array<string, mixed>
+	 */
+	private function dispatch_undo_row( array $row ): array {
+		$undo_strategy = isset( $row['undo_strategy'] ) ? sanitize_key( (string) $row['undo_strategy'] ) : '';
+		$row_type      = isset( $row['row_type'] ) ? sanitize_key( (string) $row['row_type'] ) : '';
+
+		if ( 'delete_created_variation' === $undo_strategy && 'variation' === $row_type ) {
+			return $this->delete_with_service( 'PAT_Variation_Save_Service', $row );
+		}
+
+		return $this->dispatch_to_service( $row );
 	}
 
 	/**
@@ -259,6 +327,47 @@ class PAT_Undo_Controller {
 			'status'  => 'error',
 			'message' => __( 'Save service does not expose a supported method for undo.', 'product-admin-tool' ),
 			'errors'  => array( 'service' => __( 'Save service does not expose a supported method for undo.', 'product-admin-tool' ) ),
+		);
+	}
+
+	/**
+	 * Call a delete method on a service class when undo requires entity removal.
+	 *
+	 * @param string               $class_name Service class name.
+	 * @param array<string, mixed> $row        Payload.
+	 * @return array<string, mixed>
+	 */
+	private function delete_with_service( string $class_name, array $row ): array {
+		if ( ! class_exists( $class_name ) ) {
+			return array(
+				'id'      => isset( $row['id'] ) ? absint( $row['id'] ) : 0,
+				'row_type'=> isset( $row['row_type'] ) ? sanitize_key( (string) $row['row_type'] ) : '',
+				'status'  => 'error',
+				'message' => __( 'Delete service is not available for undo.', 'product-admin-tool' ),
+				'errors'  => array( 'service' => __( 'Delete service is not available for undo.', 'product-admin-tool' ) ),
+			);
+		}
+
+		$service = new $class_name();
+
+		if ( ! method_exists( $service, 'delete_row' ) ) {
+			return array(
+				'id'      => isset( $row['id'] ) ? absint( $row['id'] ) : 0,
+				'row_type'=> isset( $row['row_type'] ) ? sanitize_key( (string) $row['row_type'] ) : '',
+				'status'  => 'error',
+				'message' => __( 'Delete service does not expose a supported method for undo.', 'product-admin-tool' ),
+				'errors'  => array( 'service' => __( 'Delete service does not expose a supported method for undo.', 'product-admin-tool' ) ),
+			);
+		}
+
+		$result = $service->delete_row( isset( $row['id'] ) ? absint( $row['id'] ) : 0 );
+
+		return is_array( $result ) ? $result : array(
+			'id'      => isset( $row['id'] ) ? absint( $row['id'] ) : 0,
+			'row_type'=> isset( $row['row_type'] ) ? sanitize_key( (string) $row['row_type'] ) : '',
+			'status'  => 'error',
+			'message' => __( 'Delete service returned an invalid undo result.', 'product-admin-tool' ),
+			'errors'  => array( 'service' => __( 'Delete service returned an invalid undo result.', 'product-admin-tool' ) ),
 		);
 	}
 }

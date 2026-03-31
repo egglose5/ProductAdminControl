@@ -991,7 +991,7 @@
 		});
 	}
 
-	function requestUndoLastSave() {
+	function requestUndoLastSave(batchId) {
 		if (!window.PATAdmin || !window.PATAdmin.ajaxUrl || !window.PATAdmin.undoAction) {
 			return Promise.resolve({
 				success: false,
@@ -1003,6 +1003,10 @@
 		var formData = new window.FormData();
 		formData.append('action', window.PATAdmin.undoAction);
 		formData.append(window.PATAdmin.undoNonceField || 'nonce', window.PATAdmin.undoNonce || '');
+
+		if (batchId) {
+			formData.append('batch_id', String(batchId));
+		}
 
 		return window.fetch(window.PATAdmin.ajaxUrl, {
 			method: 'POST',
@@ -1022,20 +1026,49 @@
 	function applyUndoResults(root, response) {
 		var payload = response && response.data && !Array.isArray(response.results) ? response.data : response;
 		var results = payload && Array.isArray(payload.results) ? payload.results : [];
-		var requestRows = results.map(function (result) {
-			return {
+		var requestRows = [];
+		var forwardedResults = [];
+		var removedRows = false;
+
+		results.forEach(function (result) {
+			if (result && 'deleted' === result.status) {
+				var deletedRowKey = result.client_row_id ? String(result.client_row_id) : String(result && result.id ? result.id : 0);
+				var deletedRow = root.querySelector(ROW_SELECTOR + '[data-pat-row-id="' + deletedRowKey + '"]');
+
+				if (deletedRow && deletedRow.parentNode) {
+					deletedRow.parentNode.removeChild(deletedRow);
+					removedRows = true;
+				}
+
+				if (result.data && result.data.parent_id) {
+					clearVariationState(result.data.parent_id);
+				}
+
+				return;
+			}
+
+			forwardedResults.push(result);
+			requestRows.push({
 				id: result && result.id ? result.id : 0,
 				client_row_id: result && result.client_row_id ? String(result.client_row_id) : String(result && result.id ? result.id : 0)
-			};
+			});
 		});
 
-		applySaveResults(root, response, requestRows);
+		if (removedRows) {
+			refreshSelectionAfterDomChange(root);
+		}
+
+		applySaveResults(root, {
+			success: payload && payload.success,
+			message: payload && payload.message ? payload.message : '',
+			results: forwardedResults
+		}, requestRows);
 	}
 
-	function handleUndoClick(root) {
-		updateToolbar(root, 'saving', 'Undoing latest saved batch...');
+	function handleUndoClick(root, batchId) {
+		updateToolbar(root, 'saving', batchId ? 'Undoing selected saved batch...' : 'Undoing latest saved batch...');
 
-		requestUndoLastSave().then(function (response) {
+		requestUndoLastSave(batchId).then(function (response) {
 			applyUndoResults(root, response);
 			var payload = response && response.data && !Array.isArray(response.results) ? response.data : response;
 			updateToolbar(root, payload && payload.success ? 'saved' : 'error', payload && payload.message ? payload.message : 'Undo request completed.');
@@ -2177,7 +2210,7 @@
 			if (undoBtn) {
 				event.preventDefault();
 				closeHistoryPanel(root);
-				handleUndoClick(root);
+				handleUndoClick(root, undoBtn.getAttribute('data-pat-undo-batch-id') || '');
 			}
 		});
 	}
